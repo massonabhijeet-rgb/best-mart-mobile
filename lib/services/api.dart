@@ -81,6 +81,19 @@ class ApiService {
     return data;
   }
 
+  // Devices (push notification tokens)
+  static Future<void> registerDevice({
+    required String token,
+    required String platform,
+  }) async {
+    await _req('POST', '/devices',
+        body: {'token': token, 'platform': platform}, auth: true);
+  }
+
+  static Future<void> unregisterDevice(String token) async {
+    await _req('DELETE', '/devices/$token', auth: true);
+  }
+
   // Products & Categories
   static Future<List<Product>> getProducts() async {
     final data = await _req('GET', '/products');

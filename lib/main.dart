@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/auth_provider.dart';
+import 'services/notifications_service.dart';
 import 'services/socket_service.dart';
 import 'providers/home_provider.dart';
 import 'screens/auth/login_screen.dart';
@@ -12,6 +15,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final auth = AuthProvider();
   await auth.init();
+  await NotificationsService.instance.init();
+  if (auth.isLoggedIn) {
+    unawaited(NotificationsService.instance.registerForUser());
+  }
   SocketService.instance.connect();
   runApp(
     MultiProvider(

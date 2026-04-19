@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import 'api.dart';
+import 'notifications_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? _user;
@@ -40,9 +41,11 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user', jsonEncode(data['user']));
     notifyListeners();
+    NotificationsService.instance.registerForUser();
   }
 
   Future<void> logout() async {
+    await NotificationsService.instance.unregister();
     _user = null;
     await ApiService.clearToken();
     final prefs = await SharedPreferences.getInstance();

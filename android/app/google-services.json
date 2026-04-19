@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "309492893073",
+    "project_id": "bestmart-notifications",
+    "storage_bucket": "bestmart-notifications.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:309492893073:android:c301a7da1c74acf167c630",
+        "android_client_info": {
+          "package_name": "com.bestmart.bestmart"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUNimj2iXF3g4vIRbG6S-R3LToDBp-1VU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
