@@ -36,6 +36,19 @@ class AuthProvider extends ChangeNotifier {
     await _saveSession(data);
   }
 
+  Future<void> loginWithOtp({
+    required String phone,
+    required String otp,
+    required String requestId,
+  }) async {
+    final data = await ApiService.verifyOtp(
+      phone: phone,
+      otp: otp,
+      requestId: requestId,
+    );
+    await _saveSession(data);
+  }
+
   Future<void> _saveSession(Map<String, dynamic> data) async {
     _user = User.fromJson(data['user']);
     final prefs = await SharedPreferences.getInstance();

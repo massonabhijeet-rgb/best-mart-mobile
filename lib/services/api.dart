@@ -85,6 +85,26 @@ class ApiService {
     await _req('DELETE', '/auth/me', auth: true);
   }
 
+  // OTP login
+  static Future<Map<String, dynamic>> sendOtp(String phone) async {
+    final data = await _req('POST', '/auth/otp/send', body: {'phone': phone});
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  static Future<Map<String, dynamic>> verifyOtp({
+    required String phone,
+    required String otp,
+    required String requestId,
+  }) async {
+    final data = await _req('POST', '/auth/otp/verify', body: {
+      'phone': phone,
+      'otp': otp,
+      'requestId': requestId,
+    });
+    await setToken(data['token']);
+    return data;
+  }
+
   // Devices (push notification tokens)
   static Future<void> registerDevice({
     required String token,
