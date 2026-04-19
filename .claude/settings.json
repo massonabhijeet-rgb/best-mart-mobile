@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/usr/bin/log show *)",
+      "Bash(codesign --force --sign - /tmp/cstest)",
+      "Bash(echo \"test\")",
+      "Bash(codesign --force --sign \"Apple Development\" /tmp/cstest_bin)",
+      "Bash(rm -f /tmp/cstest_bin)",
+      "Read(//Users/abhijeetmasson/Documents/**)",
+      "Bash(grep \"^[0-9]*:\\\\..*{\")",
+      "Bash(flutter analyze *)",
+      "Bash(flutter pub *)",
+      "Bash(dart run *)",
+      "Bash(sips -g pixelWidth -g pixelHeight -g hasAlpha /Users/abhijeetmasson/Documents/best-mart-IOS/assets/icon/app_icon.png)",
+      "Bash(python3 -c \"from PIL import Image; print\\('ok'\\)\")",
+      "Bash(python3)"
+    ]
+  }
+}

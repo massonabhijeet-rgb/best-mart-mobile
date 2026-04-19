@@ -1,0 +1,41 @@
+name: bestmart
+description: "BestMart — Rider & Customer app"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^1.2.2
+  shared_preferences: ^2.3.3
+  web_socket_channel: ^3.0.1
+  geolocator: ^13.0.4
+  flutter_local_notifications: ^18.0.1
+  flutter_map: ^8.1.1
+  latlong2: ^0.9.1
+  intl: ^0.20.2
+  provider: ^6.1.2
+  cached_network_image: ^3.4.1
+  url_launcher: ^6.3.1
+  qr_flutter: ^4.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter_launcher_icons:
+  ios: true
+  android: false
+  image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
