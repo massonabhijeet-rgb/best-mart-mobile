@@ -81,6 +81,10 @@ class ApiService {
     return data;
   }
 
+  static Future<void> deleteAccount() async {
+    await _req('DELETE', '/auth/me', auth: true);
+  }
+
   // Devices (push notification tokens)
   static Future<void> registerDevice({
     required String token,

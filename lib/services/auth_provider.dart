@@ -52,4 +52,16 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove('user');
     notifyListeners();
   }
+
+  // Hard delete: removes the user server-side (cascades addresses, devices,
+  // coupon redemptions; anonymises orders) and wipes all locally-stored
+  // session data. Caller should handle errors thrown by the API.
+  Future<void> deleteAccount() async {
+    await ApiService.deleteAccount();
+    _user = null;
+    await ApiService.clearToken();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user');
+    notifyListeners();
+  }
 }
