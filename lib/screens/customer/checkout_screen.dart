@@ -12,6 +12,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/bill_summary.dart';
 import '../../widgets/checkout_deals.dart';
 import '../../widgets/coupon_input.dart';
+import '../../widgets/public_coupon_carousel.dart';
 import 'cart_provider.dart';
 import 'track_order_screen.dart';
 
@@ -221,8 +222,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   ..._buildDealsSection(cart),
                   const SizedBox(height: AppSpacing.md),
+                  Consumer<HomeProvider>(
+                    builder: (_, home, __) {
+                      if (home.coupons.isEmpty) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: AppRadius.brMd,
+                            border: Border.all(color: AppColors.borderSoft),
+                            boxShadow: AppShadow.soft,
+                          ),
+                          padding: const EdgeInsets.only(
+                              bottom: AppSpacing.sm),
+                          child: PublicCouponCarousel(
+                            coupons: home.coupons,
+                            onApply: (code) =>
+                                context.read<CartProvider>().applyCoupon(code),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   _Section(
-                    title: 'Apply coupon',
+                    title: 'Have another code?',
                     icon: Icons.local_offer_outlined,
                     child: const CouponInput(),
                   ),

@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Text(
-                  'bestMart',
+                  'BestMart',
                   style: Theme.of(context).textTheme.displaySmall,
                 ),
                 const SizedBox(height: 4),

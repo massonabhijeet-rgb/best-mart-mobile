@@ -6,7 +6,14 @@ import '../theme/tokens.dart';
 
 class PublicCouponCarousel extends StatefulWidget {
   final List<Coupon> coupons;
-  const PublicCouponCarousel({super.key, required this.coupons});
+  // When provided, tapping a coupon calls [onApply] with the code instead of
+  // copying to the clipboard. Used on checkout to apply the coupon inline.
+  final Future<bool> Function(String code)? onApply;
+  const PublicCouponCarousel({
+    super.key,
+    required this.coupons,
+    this.onApply,
+  });
 
   @override
   State<PublicCouponCarousel> createState() => _PublicCouponCarouselState();
@@ -23,9 +30,25 @@ class _PublicCouponCarouselState extends State<PublicCouponCarousel> {
     _Palette(Color(0xFF0EA5E9), Color(0xFF0369A1), Colors.white),
   ];
 
-  Future<void> _copy(String code) async {
-    await Clipboard.setData(ClipboardData(text: code));
+  Future<void> _handleTap(String code) async {
     HapticFeedback.selectionClick();
+    final onApply = widget.onApply;
+    if (onApply != null) {
+      final ok = await onApply(code);
+      if (!mounted) return;
+      if (ok) {
+        setState(() => _copiedCode = code);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Coupon "$code" applied'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: code));
     if (!mounted) return;
     setState(() => _copiedCode = code);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -58,8 +81,8 @@ class _PublicCouponCarouselState extends State<PublicCouponCarousel> {
             padding: const EdgeInsets.only(right: AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
+              children: [
+                const Text(
                   '🎟  Limited-time offers',
                   style: TextStyle(
                     fontSize: 11,
@@ -68,8 +91,8 @@ class _PublicCouponCarouselState extends State<PublicCouponCarousel> {
                     letterSpacing: 0.4,
                   ),
                 ),
-                SizedBox(height: 2),
-                Text(
+                const SizedBox(height: 2),
+                const Text(
                   'Save more with coupon codes',
                   style: TextStyle(
                     fontSize: 18,
@@ -79,10 +102,12 @@ class _PublicCouponCarouselState extends State<PublicCouponCarousel> {
                     height: 1.1,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Tap a coupon to copy the code',
-                  style: TextStyle(
+                  widget.onApply != null
+                      ? 'Tap a coupon to apply it'
+                      : 'Tap a coupon to copy the code',
+                  style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.inkFaint,
                     fontWeight: FontWeight.w500,
@@ -107,7 +132,8 @@ class _PublicCouponCarouselState extends State<PublicCouponCarousel> {
                   coupon: c,
                   palette: palette,
                   isCopied: _copiedCode == c.code,
-                  onCopy: () => _copy(c.code),
+                  isApplyMode: widget.onApply != null,
+                  onCopy: () => _handleTap(c.code),
                 );
               },
             ),
@@ -129,12 +155,14 @@ class _CouponCard extends StatelessWidget {
   final Coupon coupon;
   final _Palette palette;
   final bool isCopied;
+  final bool isApplyMode;
   final VoidCallback onCopy;
 
   const _CouponCard({
     required this.coupon,
     required this.palette,
     required this.isCopied,
+    required this.isApplyMode,
     required this.onCopy,
   });
 
@@ -296,13 +324,19 @@ class _CouponCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isCopied ? Icons.check_rounded : Icons.copy_rounded,
+                        isCopied
+                            ? Icons.check_rounded
+                            : (isApplyMode
+                                ? Icons.bolt_rounded
+                                : Icons.copy_rounded),
                         size: 14,
                         color: palette.ink,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        isCopied ? 'Copied' : 'Copy',
+                        isCopied
+                            ? (isApplyMode ? 'Applied' : 'Copied')
+                            : (isApplyMode ? 'Apply' : 'Copy'),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,

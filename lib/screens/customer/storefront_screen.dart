@@ -12,7 +12,6 @@ import '../../widgets/cart_preview_sheet.dart';
 import '../../widgets/category_tiles_grid.dart';
 import '../../widgets/home_rail.dart';
 import '../../widgets/product_card.dart';
-import '../../widgets/public_coupon_carousel.dart';
 import '../../widgets/section_background.dart';
 import '../../widgets/skeleton.dart';
 import 'cart_provider.dart';
@@ -124,7 +123,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
             ),
             const SizedBox(width: AppSpacing.sm),
             const Text(
-              'bestMart',
+              'BestMart',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 18,
@@ -198,10 +197,6 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
           const SliverToBoxAdapter(child: _DeliveryHeader()),
           const SliverToBoxAdapter(child: _ContextBanner()),
           SliverToBoxAdapter(child: _searchBar()),
-          if (home.coupons.isNotEmpty && !home.isFiltered)
-            SliverToBoxAdapter(
-              child: PublicCouponCarousel(coupons: home.coupons),
-            ),
           const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
           SliverToBoxAdapter(child: _categoryChips(home)),
           if (home.isFiltered)
@@ -683,14 +678,14 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   int _gridColumnCount() {
     final width = MediaQuery.sizeOf(context).width;
     return width >= 1100
-        ? 8
+        ? 6
         : width >= 900
-            ? 6
+            ? 5
             : width >= 600
-                ? 5
-                : width >= 360
-                    ? 4
-                    : 3;
+                ? 4
+                : width >= 380
+                    ? 3
+                    : 2;
   }
 
   Widget _skeletonGrid() {
