@@ -525,8 +525,8 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       final theme = _railThemes[(i + 1) % _railThemes.length];
       slivers.add(SliverToBoxAdapter(
         child: HomeRail(
-          title: rail.name,
-          subtitle: '${rail.products.length}+ products · delivered in 15 min',
+          title: 'Top in ${rail.name}',
+          subtitle: '${rail.products.length}+ picks · delivered in 15 min',
           emoji: theme.emoji,
           tint: theme.tint,
           products: rail.products,
