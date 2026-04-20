@@ -54,18 +54,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'label': 'PhonePe',
       'sub': 'Opens PhonePe directly via UPI',
       'icon': Icons.account_balance_wallet_outlined,
+      'iconUrl':
+          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/phonepay.png',
     },
     {
       'value': 'gpay',
       'label': 'Google Pay',
       'sub': 'Opens GPay directly via UPI',
       'icon': Icons.account_balance_wallet_outlined,
+      'iconUrl':
+          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/googlepay.png',
     },
     {
       'value': 'paytm',
       'label': 'Paytm',
       'sub': 'Opens Paytm directly via UPI',
       'icon': Icons.account_balance_wallet_outlined,
+      'iconUrl':
+          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/paytm.png',
     },
     {
       'value': 'razorpay',
@@ -180,6 +186,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   IconData _paymentIcon() => _paymentEntry()['icon'] as IconData;
 
+  String? _paymentIconUrl() => _paymentEntry()['iconUrl'] as String?;
+
   // Groups used in the payment bottom sheet. Order within each group mirrors
   // the `_payMethods` master list so defaults stay stable.
   static const List<String> _payOnlineValues = [
@@ -240,6 +248,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     label: p['label'] as String,
                     subtitle: p['sub'] as String,
                     icon: p['icon'] as IconData,
+                    iconUrl: p['iconUrl'] as String?,
                     selected: _payment == p['value'],
                     onTap: () =>
                         Navigator.of(sheetContext).pop(p['value'] as String),
@@ -646,6 +655,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     key: _paymentSectionKey,
                     label: _paymentLabel(),
                     icon: _paymentIcon(),
+                    iconUrl: _paymentIconUrl(),
                     onChange: _openPaymentSheet,
                   ),
                   if (_error.isNotEmpty) ...[
@@ -985,11 +995,13 @@ class _SlotChip extends StatelessWidget {
 class _PaymentSummaryCard extends StatelessWidget {
   final String label;
   final IconData icon;
+  final String? iconUrl;
   final VoidCallback onChange;
   const _PaymentSummaryCard({
     super.key,
     required this.label,
     required this.icon,
+    this.iconUrl,
     required this.onChange,
   });
 
@@ -1012,12 +1024,21 @@ class _PaymentSummaryCard extends StatelessWidget {
               Container(
                 width: 36,
                 height: 36,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: AppColors.brandBlue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child:
-                    Icon(icon, color: AppColors.brandBlue, size: 20),
+                child: iconUrl != null
+                    ? Image.network(
+                        iconUrl!,
+                        width: 30,
+                        height: 30,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Icon(icon,
+                            color: AppColors.brandBlue, size: 20),
+                      )
+                    : Icon(icon, color: AppColors.brandBlue, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1070,12 +1091,14 @@ class _PaymentTile extends StatelessWidget {
   final String label;
   final String subtitle;
   final IconData icon;
+  final String? iconUrl;
   final bool selected;
   final VoidCallback onTap;
   const _PaymentTile({
     required this.label,
     required this.subtitle,
     required this.icon,
+    this.iconUrl,
     required this.selected,
     required this.onTap,
   });
@@ -1112,11 +1135,29 @@ class _PaymentTile extends StatelessWidget {
                         : AppColors.brandBlue.withValues(alpha: 0.1),
                     borderRadius: AppRadius.brSm,
                   ),
-                  child: Icon(
-                    icon,
-                    color: selected ? Colors.white : AppColors.brandBlue,
-                    size: 20,
-                  ),
+                  child: iconUrl != null
+                      ? ClipRRect(
+                          borderRadius: AppRadius.brSm,
+                          child: Image.network(
+                            iconUrl!,
+                            width: 30,
+                            height: 30,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Icon(
+                              icon,
+                              color: selected
+                                  ? Colors.white
+                                  : AppColors.brandBlue,
+                              size: 20,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          icon,
+                          color:
+                              selected ? Colors.white : AppColors.brandBlue,
+                          size: 20,
+                        ),
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
