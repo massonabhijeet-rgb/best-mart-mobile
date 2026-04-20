@@ -171,12 +171,134 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  String _paymentLabel() {
-    final match = _payMethods.firstWhere(
-      (m) => m['value'] == _payment,
-      orElse: () => {'label': _payment},
+  Map<String, dynamic> _paymentEntry() => _payMethods.firstWhere(
+        (m) => m['value'] == _payment,
+        orElse: () => {'label': _payment, 'icon': Icons.payment},
+      );
+
+  String _paymentLabel() => _paymentEntry()['label'] as String;
+
+  IconData _paymentIcon() => _paymentEntry()['icon'] as IconData;
+
+  // Groups used in the payment bottom sheet. Order within each group mirrors
+  // the `_payMethods` master list so defaults stay stable.
+  static const List<String> _payOnlineValues = [
+    'phonepe',
+    'gpay',
+    'paytm',
+    'razorpay',
+  ];
+  static const List<String> _payOnDeliveryValues = [
+    'upi',
+    'card',
+    'cash_on_delivery',
+  ];
+
+  Future<void> _openPaymentSheet() async {
+    HapticFeedback.selectionClick();
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.pageBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final onlineTiles = _payMethods
+            .where((m) => _payOnlineValues.contains(m['value']))
+            .toList();
+        final onDeliveryTiles = _payMethods
+            .where((m) => _payOnDeliveryValues.contains(m['value']))
+            .toList();
+        Widget buildGroup(String title, List<Map<String, dynamic>> tiles) {
+          return Container(
+            margin: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.borderSoft),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink,
+                      fontSize: 13,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+                for (final p in tiles)
+                  _PaymentTile(
+                    label: p['label'] as String,
+                    subtitle: p['sub'] as String,
+                    icon: p['icon'] as IconData,
+                    selected: _payment == p['value'],
+                    onTap: () =>
+                        Navigator.of(sheetContext).pop(p['value'] as String),
+                  ),
+              ],
+            ),
+          );
+        }
+
+        return SafeArea(
+          child: DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            minChildSize: 0.4,
+            maxChildSize: 0.9,
+            expand: false,
+            builder: (_, scrollCtrl) => Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Select Payment Method',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close,
+                            color: AppColors.inkMuted),
+                        onPressed: () =>
+                            Navigator.of(sheetContext).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.only(bottom: 16),
+                    children: [
+                      buildGroup('Pay online', onlineTiles),
+                      buildGroup('Pay on delivery', onDeliveryTiles),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
-    return match['label'] as String;
+    if (picked != null && picked != _payment) {
+      setState(() => _payment = picked);
+    }
   }
 
   static String _upiAppLabel(String app) {
@@ -382,17 +504,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         placing: _placing,
         onPlace: _placeOrder,
         paymentLabel: _paymentLabel(),
-        onChangePayment: () {
-          final ctx = _paymentSectionKey.currentContext;
-          if (ctx != null) {
-            Scrollable.ensureVisible(
-              ctx,
-              duration: const Duration(milliseconds: 350),
-              curve: Curves.easeInOut,
-              alignment: 0.1,
-            );
-          }
-        },
+        onChangePayment: _openPaymentSheet,
       ),
       body: empty
           ? const _EmptyCart()
@@ -530,25 +642,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  _Section(
+                  _PaymentSummaryCard(
                     key: _paymentSectionKey,
-                    title: 'Payment method',
-                    icon: Icons.payment,
-                    child: Column(
-                      children: _payMethods
-                          .map((p) => _PaymentTile(
-                                label: p['label'] as String,
-                                subtitle: p['sub'] as String,
-                                icon: p['icon'] as IconData,
-                                selected: _payment == p['value'],
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(
-                                      () => _payment = p['value'] as String);
-                                },
-                              ))
-                          .toList(),
-                    ),
+                    label: _paymentLabel(),
+                    icon: _paymentIcon(),
+                    onChange: _openPaymentSheet,
                   ),
                   if (_error.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.md),
@@ -748,7 +846,6 @@ class _Section extends StatelessWidget {
   final IconData icon;
   final Widget child;
   const _Section({
-    super.key,
     required this.title,
     required this.icon,
     required this.child,
@@ -883,6 +980,90 @@ class _SlotChip extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _PaymentSummaryCard extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onChange;
+  const _PaymentSummaryCard({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.onChange,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: AppRadius.brMd,
+      child: InkWell(
+        onTap: onChange,
+        borderRadius: AppRadius.brMd,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.brMd,
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.brandBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child:
+                    Icon(icon, color: AppColors.brandBlue, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Payment method',
+                      style: TextStyle(
+                        color: AppColors.inkMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const Text(
+                'Change',
+                style: TextStyle(
+                  color: AppColors.brandBlue,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(width: 2),
+              const Icon(Icons.chevron_right,
+                  color: AppColors.brandBlue, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _PaymentTile extends StatelessWidget {
