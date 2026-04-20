@@ -33,7 +33,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _addressCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   String _payment = 'phonepe';
-  String _slot = 'Express (2–4 hrs)';
   bool _placing = false;
   String _error = '';
   double? _lat, _lng;
@@ -41,12 +40,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   int? _selectedAddressId;
   final _paymentSectionKey = GlobalKey();
 
-  final _slots = [
-    {'value': 'Express (2–4 hrs)', 'label': 'Express', 'sub': '2–4 hrs', 'recommended': true},
-    {'value': 'Morning (8–12)', 'label': 'Morning', 'sub': '8–12', 'recommended': false},
-    {'value': 'Afternoon (12–4)', 'label': 'Afternoon', 'sub': '12–4', 'recommended': false},
-    {'value': 'Evening (4–8)', 'label': 'Evening', 'sub': '4–8', 'recommended': false},
-  ];
   final _payMethods = [
     {
       'value': 'phonepe',
@@ -183,6 +176,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       initialLatitude: _lat,
       initialLongitude: _lng,
       initialAddressLine: _addressCtrl.text,
+      initialFullName: _nameCtrl.text,
+      initialPhone: _phoneCtrl.text,
+      initialNotes: _notesCtrl.text,
       fetchCurrentLocationOnOpen: useCurrentLocation,
     );
     if (!mounted || picked == null) return;
@@ -190,6 +186,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _lat = picked.latitude;
       _lng = picked.longitude;
       _addressCtrl.text = picked.addressLine;
+      _nameCtrl.text = picked.fullName;
+      _phoneCtrl.text = picked.phone;
+      _notesCtrl.text = picked.deliveryNotes ?? '';
+      _selectedAddressId = null;
     });
   }
 
@@ -573,7 +573,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'deliveryAddress': _addressCtrl.text.trim(),
         'deliveryNotes':
             _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-        'deliverySlot': _slot,
         'paymentMethod': wirePaymentMethod,
         'deliveryLatitude': _lat,
         'deliveryLongitude': _lng,
@@ -658,76 +657,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     child: BillSummary(cart: cart),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  if (_savedAddresses.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    _Section(
-                      title: 'Deliver to',
-                      icon: Icons.home_outlined,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: _savedAddresses
-                            .map((a) => _AddressTile(
-                                  address: a,
-                                  selected: _selectedAddressId == a.id,
-                                  onTap: () {
-                                    HapticFeedback.selectionClick();
-                                    _applyAddress(a);
-                                  },
-                                ))
-                            .toList(),
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: AppSpacing.md),
                   _Section(
-                    title: 'Delivery location',
-                    icon: Icons.location_on_outlined,
-                    child: _LocationPickerCard(
-                      address: _addressCtrl.text,
+                    title: 'Deliver to',
+                    icon: Icons.home_outlined,
+                    child: _AddressSelector(
+                      savedAddresses: _savedAddresses,
+                      selectedAddressId: _selectedAddressId,
+                      hasDraft: _addressCtrl.text.trim().isNotEmpty &&
+                          _lat != null &&
+                          _lng != null,
+                      draftAddressLine: _addressCtrl.text,
+                      draftName: _nameCtrl.text,
+                      draftPhone: _phoneCtrl.text,
                       latitude: _lat,
                       longitude: _lng,
-                      onUseCurrent: () =>
+                      onSelect: (a) {
+                        HapticFeedback.selectionClick();
+                        _applyAddress(a);
+                      },
+                      onAddNew: () =>
                           _openAddressPicker(useCurrentLocation: true),
-                      onPickOnMap: () =>
+                      onEditDraft: () =>
                           _openAddressPicker(useCurrentLocation: false),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _Section(
-                    title: _savedAddresses.isNotEmpty
-                        ? 'Your details (or enter new)'
-                        : 'Your details',
-                    icon: Icons.person_outline,
-                    child: Column(
-                      children: [
-                        _field(_nameCtrl, 'Full name', TextInputType.name),
-                        _field(_phoneCtrl, 'Phone number', TextInputType.phone),
-                        _field(_emailCtrl, 'Email (optional)',
-                            TextInputType.emailAddress),
-                        _field(_notesCtrl, 'Delivery notes (optional)',
-                            TextInputType.text),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _Section(
-                    title: 'Delivery slot',
-                    icon: Icons.schedule,
-                    child: Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: _slots
-                          .map((s) => _SlotChip(
-                                label: s['label'] as String,
-                                subtitle: s['sub'] as String,
-                                recommended: s['recommended'] as bool,
-                                selected: _slot == s['value'],
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _slot = s['value'] as String);
-                                },
-                              ))
-                          .toList(),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -781,26 +733,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     ];
   }
 
-  Widget _field(
-    TextEditingController ctrl,
-    String label,
-    TextInputType type, {
-    int maxLines = 1,
-  }) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: TextField(
-          controller: ctrl,
-          keyboardType: type,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            labelText: label,
-            border: OutlineInputBorder(borderRadius: AppRadius.brMd),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md, vertical: AppSpacing.md),
-          ),
-        ),
-      );
 }
 
 class _CartLine extends StatelessWidget {
@@ -970,104 +902,6 @@ class _Section extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             child,
           ],
-        ),
-      );
-}
-
-class _SlotChip extends StatelessWidget {
-  final String label;
-  final String subtitle;
-  final bool recommended;
-  final bool selected;
-  final VoidCallback onTap;
-  const _SlotChip({
-    required this.label,
-    required this.subtitle,
-    required this.recommended,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.brMd,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
-          ),
-          decoration: BoxDecoration(
-            color: selected
-                ? AppColors.brandBlue.withValues(alpha: 0.08)
-                : AppColors.surface,
-            borderRadius: AppRadius.brMd,
-            border: Border.all(
-              color: selected ? AppColors.brandBlue : AppColors.borderSoft,
-              width: selected ? 1.6 : 1,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    selected
-                        ? Icons.check_circle
-                        : Icons.radio_button_unchecked,
-                    size: 14,
-                    color: selected ? AppColors.brandBlue : AppColors.inkFaint,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: selected ? AppColors.brandBlueDark : AppColors.ink,
-                    ),
-                  ),
-                  if (recommended) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.brandGreen,
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                      child: const Text(
-                        'FASTEST',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 2),
-              Padding(
-                padding: const EdgeInsets.only(left: 20),
-                child: Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppColors.inkFaint,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       );
 }
@@ -1560,110 +1394,248 @@ class _StickyCheckoutBar extends StatelessWidget {
     );
   }
 }
+class _AddressSelector extends StatelessWidget {
+  final List<SavedAddress> savedAddresses;
+  final int? selectedAddressId;
+  final bool hasDraft;
+  final String draftAddressLine;
+  final String draftName;
+  final String draftPhone;
+  final double? latitude;
+  final double? longitude;
+  final ValueChanged<SavedAddress> onSelect;
+  final VoidCallback onAddNew;
+  final VoidCallback onEditDraft;
 
-class _AddressTile extends StatelessWidget {
-  final SavedAddress address;
-  final bool selected;
-  final VoidCallback onTap;
-  const _AddressTile({
-    required this.address,
-    required this.selected,
-    required this.onTap,
+  const _AddressSelector({
+    required this.savedAddresses,
+    required this.selectedAddressId,
+    required this.hasDraft,
+    required this.draftAddressLine,
+    required this.draftName,
+    required this.draftPhone,
+    required this.latitude,
+    required this.longitude,
+    required this.onSelect,
+    required this.onAddNew,
+    required this.onEditDraft,
   });
 
+  // `-1` is the sentinel for the "+ Add new address" option in the dropdown.
+  static const int _kAddNewValue = -1;
+
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppRadius.brMd,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: selected
-                  ? AppColors.brandBlue.withValues(alpha: 0.06)
-                  : AppColors.surface,
-              borderRadius: AppRadius.brMd,
-              border: Border.all(
-                color: selected ? AppColors.brandBlue : AppColors.borderSoft,
-                width: selected ? 1.6 : 1,
-              ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  selected
-                      ? Icons.check_circle
-                      : Icons.radio_button_unchecked,
-                  size: 18,
-                  color: selected ? AppColors.brandBlue : AppColors.inkFaint,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              address.fullName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13,
-                                color: selected
-                                    ? AppColors.brandBlueDark
-                                    : AppColors.ink,
-                              ),
-                            ),
-                          ),
-                          if (address.useCount > 1) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 5, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: AppColors.brandGreen
-                                    .withValues(alpha: 0.12),
-                                borderRadius:
-                                    BorderRadius.circular(AppRadius.full),
-                              ),
-                              child: Text(
-                                'Used ${address.useCount}x',
-                                style: const TextStyle(
-                                  color: AppColors.brandGreenDark,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${address.phone} · ${address.deliveryAddress}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.inkFaint,
-                          fontSize: 11,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+  Widget build(BuildContext context) {
+    final SavedAddress? selected = selectedAddressId == null
+        ? null
+        : savedAddresses.firstWhere(
+            (a) => a.id == selectedAddressId,
+            orElse: () => savedAddresses.first,
+          );
+
+    if (savedAddresses.isEmpty && !hasDraft) {
+      return SizedBox(
+        height: 48,
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: onAddNew,
+          icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+          label: const Text(
+            'Add a delivery address',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.brandBlue,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: AppRadius.brMd),
           ),
         ),
       );
+    }
+
+    final int? dropdownValue = selectedAddressId ??
+        (hasDraft ? null : (savedAddresses.isNotEmpty ? savedAddresses.first.id : null));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (savedAddresses.isNotEmpty)
+          DropdownButtonFormField<int>(
+            initialValue: dropdownValue,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: 'Saved addresses',
+              border: OutlineInputBorder(borderRadius: AppRadius.brMd),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+            ),
+            items: [
+              ...savedAddresses.map(
+                (a) => DropdownMenuItem<int>(
+                  value: a.id,
+                  child: Text(
+                    '${a.fullName} · ${a.phone} · ${a.deliveryAddress}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ),
+              const DropdownMenuItem<int>(
+                value: _kAddNewValue,
+                child: Text(
+                  '+ Add a new address',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.brandBlue,
+                  ),
+                ),
+              ),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              if (value == _kAddNewValue) {
+                onAddNew();
+                return;
+              }
+              final picked = savedAddresses.firstWhere((a) => a.id == value);
+              onSelect(picked);
+            },
+          ),
+        if (selected != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _SummaryCard(
+            name: selected.fullName,
+            phone: selected.phone,
+            addressLine: selected.deliveryAddress,
+            latitude: selected.latitude,
+            longitude: selected.longitude,
+            onChange: onAddNew,
+            changeLabel: 'Add new',
+          ),
+        ] else if (hasDraft) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _SummaryCard(
+            name: draftName,
+            phone: draftPhone,
+            addressLine: draftAddressLine,
+            latitude: latitude,
+            longitude: longitude,
+            onChange: onEditDraft,
+            changeLabel: 'Edit',
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  final String name;
+  final String phone;
+  final String addressLine;
+  final double? latitude;
+  final double? longitude;
+  final VoidCallback onChange;
+  final String changeLabel;
+
+  const _SummaryCard({
+    required this.name,
+    required this.phone,
+    required this.addressLine,
+    required this.latitude,
+    required this.longitude,
+    required this.onChange,
+    required this.changeLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.brMd,
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.brandGreen.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.location_on,
+                color: AppColors.brandGreen, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (name.trim().isNotEmpty || phone.trim().isNotEmpty)
+                  Text(
+                    [name.trim(), phone.trim()]
+                        .where((s) => s.isNotEmpty)
+                        .join(' · '),
+                    style: const TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                const SizedBox(height: 2),
+                Text(
+                  addressLine.trim(),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.inkMuted,
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
+                ),
+                if (latitude != null && longitude != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    '${latitude!.toStringAsFixed(5)}, ${longitude!.toStringAsFixed(5)}',
+                    style: const TextStyle(
+                      color: AppColors.inkFaint,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onChange,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              changeLabel,
+              style: const TextStyle(
+                color: AppColors.brandBlue,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _EmptyCart extends StatelessWidget {
@@ -1705,180 +1677,6 @@ class _EmptyCart extends StatelessWidget {
         ),
       );
 }
-
-class _LocationPickerCard extends StatelessWidget {
-  final String address;
-  final double? latitude;
-  final double? longitude;
-  final VoidCallback onUseCurrent;
-  final VoidCallback onPickOnMap;
-
-  const _LocationPickerCard({
-    required this.address,
-    required this.latitude,
-    required this.longitude,
-    required this.onUseCurrent,
-    required this.onPickOnMap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final hasAddress =
-        address.trim().isNotEmpty && latitude != null && longitude != null;
-    if (hasAddress) {
-      return Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: AppRadius.brMd,
-          border: Border.all(color: AppColors.borderSoft),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.brandGreen.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.location_on,
-                  color: AppColors.brandGreen, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Delivering to',
-                    style: TextStyle(
-                      color: AppColors.inkMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    address.trim(),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${latitude!.toStringAsFixed(5)}, ${longitude!.toStringAsFixed(5)}',
-                    style: const TextStyle(
-                      color: AppColors.inkFaint,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            TextButton(
-              onPressed: onPickOnMap,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                minimumSize: const Size(0, 32),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text(
-                'Change',
-                style: TextStyle(
-                  color: AppColors.brandBlue,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppRadius.brMd,
-        border: Border.all(color: AppColors.borderSoft),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'Where should we deliver?',
-            style: TextStyle(
-              color: AppColors.ink,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Pick your exact spot so the rider reaches you quickly.',
-            style: TextStyle(
-              color: AppColors.inkMuted,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: onUseCurrent,
-              icon: const Icon(Icons.my_location, size: 18),
-              label: const Text(
-                'Use my current location',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.brandBlue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.brMd,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          SizedBox(
-            height: 44,
-            child: OutlinedButton.icon(
-              onPressed: onPickOnMap,
-              icon: const Icon(Icons.map_outlined, size: 18),
-              label: const Text(
-                'Pick a different location on the map',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.brandBlue,
-                side: BorderSide(color: AppColors.borderSoft),
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.brMd,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CouponEntryCard extends StatelessWidget {
   final VoidCallback onTap;
   const _CouponEntryCard({required this.onTap});

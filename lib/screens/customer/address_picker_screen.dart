@@ -7,27 +7,40 @@ import 'package:latlong2/latlong.dart';
 
 import '../../theme/tokens.dart';
 
-/// Result returned from [AddressPickerScreen.open]. Callers merge the fields
-/// into their own checkout state.
+/// Result returned from [AddressPickerScreen.open]. The picker collects both
+/// the pinned coordinate and the human-entered address details (name, phone,
+/// flat/floor/landmark, optional notes) across a two-step flow — map first,
+/// then a details modal — so checkout never needs a separate "Your details"
+/// form.
 class PickedAddress {
   final double latitude;
   final double longitude;
+  final String fullName;
+  final String phone;
   final String addressLine;
+  final String? deliveryNotes;
 
   const PickedAddress({
     required this.latitude,
     required this.longitude,
+    required this.fullName,
+    required this.phone,
     required this.addressLine,
+    this.deliveryNotes,
   });
 }
 
 /// Full-screen in-app map picker. Pins to map center; the user pans the map
-/// to adjust. Bottom panel collects flat / floor / landmark so we have a
-/// usable street address alongside the GPS coords.
+/// to adjust. On "Continue" we open a bottom sheet that collects the
+/// flat/floor/landmark, name and phone — so the checkout page itself can
+/// stay a pure address-selector with no extra form fields.
 class AddressPickerScreen extends StatefulWidget {
   final double? initialLatitude;
   final double? initialLongitude;
   final String initialAddressLine;
+  final String initialFullName;
+  final String initialPhone;
+  final String initialNotes;
   final bool fetchCurrentLocationOnOpen;
 
   const AddressPickerScreen({
@@ -35,6 +48,9 @@ class AddressPickerScreen extends StatefulWidget {
     this.initialLatitude,
     this.initialLongitude,
     this.initialAddressLine = '',
+    this.initialFullName = '',
+    this.initialPhone = '',
+    this.initialNotes = '',
     this.fetchCurrentLocationOnOpen = false,
   });
 
@@ -43,6 +59,9 @@ class AddressPickerScreen extends StatefulWidget {
     double? initialLatitude,
     double? initialLongitude,
     String initialAddressLine = '',
+    String initialFullName = '',
+    String initialPhone = '',
+    String initialNotes = '',
     bool fetchCurrentLocationOnOpen = false,
   }) {
     return Navigator.of(context).push<PickedAddress>(
@@ -51,6 +70,9 @@ class AddressPickerScreen extends StatefulWidget {
           initialLatitude: initialLatitude,
           initialLongitude: initialLongitude,
           initialAddressLine: initialAddressLine,
+          initialFullName: initialFullName,
+          initialPhone: initialPhone,
+          initialNotes: initialNotes,
           fetchCurrentLocationOnOpen: fetchCurrentLocationOnOpen,
         ),
       ),
@@ -65,7 +87,6 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
   static const LatLng _fallbackCenter = LatLng(28.6139, 77.2090); // Delhi
 
   final _mapCtrl = MapController();
-  final _addressCtrl = TextEditingController();
   late LatLng _pinned;
   bool _locating = false;
   String? _locationError;
@@ -77,18 +98,11 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
       widget.initialLatitude ?? _fallbackCenter.latitude,
       widget.initialLongitude ?? _fallbackCenter.longitude,
     );
-    _addressCtrl.text = widget.initialAddressLine;
     if (widget.fetchCurrentLocationOnOpen) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _fetchCurrentLocation();
       });
     }
-  }
-
-  @override
-  void dispose() {
-    _addressCtrl.dispose();
-    super.dispose();
   }
 
   Future<void> _fetchCurrentLocation() async {
@@ -129,21 +143,33 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
     }
   }
 
-  void _confirm() {
-    Navigator.of(context).pop(PickedAddress(
-      latitude: _pinned.latitude,
-      longitude: _pinned.longitude,
-      addressLine: _addressCtrl.text.trim(),
-    ));
+  Future<void> _continueToDetails() async {
+    final picked = await showModalBottomSheet<PickedAddress>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.pageBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => _AddressDetailsSheet(
+        latitude: _pinned.latitude,
+        longitude: _pinned.longitude,
+        initialAddressLine: widget.initialAddressLine,
+        initialFullName: widget.initialFullName,
+        initialPhone: widget.initialPhone,
+        initialNotes: widget.initialNotes,
+      ),
+    );
+    if (!mounted || picked == null) return;
+    Navigator.of(context).pop(picked);
   }
 
   @override
   Widget build(BuildContext context) {
-    final canConfirm = _addressCtrl.text.trim().isNotEmpty;
     return Scaffold(
       backgroundColor: AppColors.pageBg,
       appBar: AppBar(
-        title: const Text('Set delivery location'),
+        title: const Text('Pin your delivery location'),
       ),
       body: Column(
         children: [
@@ -281,27 +307,6 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  TextField(
-                    controller: _addressCtrl,
-                    maxLines: 2,
-                    textCapitalization: TextCapitalization.sentences,
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      hintText:
-                          'Flat / house no., floor, street, landmark…',
-                      filled: true,
-                      fillColor: AppColors.pageBg,
-                      border: OutlineInputBorder(
-                        borderRadius: AppRadius.brMd,
-                        borderSide: BorderSide(color: AppColors.borderSoft),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: AppRadius.brMd,
-                        borderSide: BorderSide(color: AppColors.borderSoft),
-                      ),
-                    ),
-                  ),
                   if (_locationError != null) ...[
                     const SizedBox(height: AppSpacing.sm),
                     Text(
@@ -316,17 +321,16 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
                   SizedBox(
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: canConfirm ? _confirm : null,
+                      onPressed: _continueToDetails,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.brandBlue,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: AppColors.borderSoft,
                         shape: RoundedRectangleBorder(
                           borderRadius: AppRadius.brMd,
                         ),
                       ),
                       child: const Text(
-                        'Confirm delivery location',
+                        'Continue',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
@@ -342,4 +346,210 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
       ),
     );
   }
+}
+
+class _AddressDetailsSheet extends StatefulWidget {
+  final double latitude;
+  final double longitude;
+  final String initialAddressLine;
+  final String initialFullName;
+  final String initialPhone;
+  final String initialNotes;
+
+  const _AddressDetailsSheet({
+    required this.latitude,
+    required this.longitude,
+    required this.initialAddressLine,
+    required this.initialFullName,
+    required this.initialPhone,
+    required this.initialNotes,
+  });
+
+  @override
+  State<_AddressDetailsSheet> createState() => _AddressDetailsSheetState();
+}
+
+class _AddressDetailsSheetState extends State<_AddressDetailsSheet> {
+  late final TextEditingController _addressCtrl;
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _phoneCtrl;
+  late final TextEditingController _notesCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _addressCtrl = TextEditingController(text: widget.initialAddressLine);
+    _nameCtrl = TextEditingController(text: widget.initialFullName);
+    _phoneCtrl = TextEditingController(text: widget.initialPhone);
+    _notesCtrl = TextEditingController(text: widget.initialNotes);
+  }
+
+  @override
+  void dispose() {
+    _addressCtrl.dispose();
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  bool get _canSave =>
+      _addressCtrl.text.trim().isNotEmpty &&
+      _nameCtrl.text.trim().isNotEmpty &&
+      _phoneCtrl.text.trim().isNotEmpty;
+
+  void _save() {
+    if (!_canSave) return;
+    Navigator.of(context).pop(
+      PickedAddress(
+        latitude: widget.latitude,
+        longitude: widget.longitude,
+        fullName: _nameCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(),
+        addressLine: _addressCtrl.text.trim(),
+        deliveryNotes: _notesCtrl.text.trim().isEmpty
+            ? null
+            : _notesCtrl.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: SafeArea(
+        top: false,
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, scrollCtrl) => Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Address details',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon:
+                          const Icon(Icons.close, color: AppColors.inkMuted),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandBlue.withValues(alpha: 0.06),
+                        borderRadius: AppRadius.brMd,
+                        border: Border.all(
+                          color: AppColors.brandBlue.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on,
+                              color: AppColors.brandBlue, size: 18),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Pinned at ${widget.latitude.toStringAsFixed(5)}, ${widget.longitude.toStringAsFixed(5)}',
+                              style: const TextStyle(
+                                color: AppColors.brandBlueDark,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _field(
+                      _addressCtrl,
+                      'Flat / house no., floor, landmark',
+                      TextInputType.streetAddress,
+                      maxLines: 2,
+                    ),
+                    _field(_nameCtrl, 'Full name', TextInputType.name),
+                    _field(_phoneCtrl, 'Phone number', TextInputType.phone),
+                    _field(
+                      _notesCtrl,
+                      'Delivery notes (optional)',
+                      TextInputType.text,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _canSave ? _save : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.brandBlue,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: AppColors.borderSoft,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: AppRadius.brMd,
+                          ),
+                        ),
+                        child: const Text(
+                          'Save delivery address',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _field(
+    TextEditingController ctrl,
+    String label,
+    TextInputType type, {
+    int maxLines = 1,
+  }) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: TextField(
+          controller: ctrl,
+          keyboardType: type,
+          maxLines: maxLines,
+          textCapitalization: type == TextInputType.name
+              ? TextCapitalization.words
+              : TextCapitalization.sentences,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            labelText: label,
+            border: OutlineInputBorder(borderRadius: AppRadius.brMd),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.md),
+          ),
+        ),
+      );
 }
