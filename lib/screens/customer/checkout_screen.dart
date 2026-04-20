@@ -32,7 +32,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _emailCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
-  String _payment = 'cash_on_delivery';
+  String _payment = 'phonepe';
   String _slot = 'Express (2–4 hrs)';
   bool _placing = false;
   String _error = '';
@@ -40,6 +40,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _fetchingLocation = false;
   List<SavedAddress> _savedAddresses = [];
   int? _selectedAddressId;
+  final _paymentSectionKey = GlobalKey();
 
   final _slots = [
     {'value': 'Express (2–4 hrs)', 'label': 'Express', 'sub': '2–4 hrs', 'recommended': true},
@@ -48,12 +49,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     {'value': 'Evening (4–8)', 'label': 'Evening', 'sub': '4–8', 'recommended': false},
   ];
   final _payMethods = [
-    {
-      'value': 'cash_on_delivery',
-      'label': 'Cash on Delivery',
-      'sub': 'Pay when the order arrives',
-      'icon': Icons.payments_outlined,
-    },
     {
       'value': 'phonepe',
       'label': 'PhonePe',
@@ -89,6 +84,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'label': 'Credit / Debit Card on Delivery',
       'sub': 'Visa, Mastercard, RuPay',
       'icon': Icons.credit_card,
+    },
+    {
+      'value': 'cash_on_delivery',
+      'label': 'Cash on Delivery',
+      'sub': 'Pay when the order arrives',
+      'icon': Icons.payments_outlined,
     },
   ];
 
@@ -168,6 +169,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } finally {
       if (mounted) setState(() => _fetchingLocation = false);
     }
+  }
+
+  String _paymentLabel() {
+    final match = _payMethods.firstWhere(
+      (m) => m['value'] == _payment,
+      orElse: () => {'label': _payment},
+    );
+    return match['label'] as String;
   }
 
   static String _upiAppLabel(String app) {
@@ -372,6 +381,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         cart: cart,
         placing: _placing,
         onPlace: _placeOrder,
+        paymentLabel: _paymentLabel(),
+        onChangePayment: () {
+          final ctx = _paymentSectionKey.currentContext;
+          if (ctx != null) {
+            Scrollable.ensureVisible(
+              ctx,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeInOut,
+              alignment: 0.1,
+            );
+          }
+        },
       ),
       body: empty
           ? const _EmptyCart()
@@ -510,6 +531,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _Section(
+                    key: _paymentSectionKey,
                     title: 'Payment method',
                     icon: Icons.payment,
                     child: Column(
@@ -726,6 +748,7 @@ class _Section extends StatelessWidget {
   final IconData icon;
   final Widget child;
   const _Section({
+    super.key,
     required this.title,
     required this.icon,
     required this.child,
@@ -958,10 +981,14 @@ class _StickyCheckoutBar extends StatelessWidget {
   final CartProvider cart;
   final bool placing;
   final VoidCallback onPlace;
+  final String paymentLabel;
+  final VoidCallback onChangePayment;
   const _StickyCheckoutBar({
     required this.cart,
     required this.placing,
     required this.onPlace,
+    required this.paymentLabel,
+    required this.onChangePayment,
   });
 
   int get _savedCents {
@@ -1007,6 +1034,60 @@ class _StickyCheckoutBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.pageBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.borderSoft),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.account_balance_wallet_outlined,
+                        size: 16, color: AppColors.inkMuted),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: RichText(
+                        overflow: TextOverflow.ellipsis,
+                        text: TextSpan(
+                          style: const TextStyle(
+                            color: AppColors.ink,
+                            fontSize: 13,
+                          ),
+                          children: [
+                            const TextSpan(text: 'Paying via '),
+                            TextSpan(
+                              text: paymentLabel,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: placing ? null : onChangePayment,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Change',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: AppColors.brandBlue,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             if (saved > 0)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
