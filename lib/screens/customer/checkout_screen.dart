@@ -105,6 +105,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     'paytm': 'paytm',
   };
 
+  Future<void>? _iconsPrecache;
+  bool _iconsPrecacheStarted = false;
+
   @override
   void initState() {
     super.initState();
@@ -115,6 +118,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _emailCtrl.text = user.email;
       _loadSavedAddresses();
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_iconsPrecacheStarted) {
+      _iconsPrecacheStarted = true;
+      _iconsPrecache = _precachePaymentIcons();
+    }
+  }
+
+  Future<void> _precachePaymentIcons() async {
+    final urls = _payMethods
+        .map((m) => m['iconUrl'] as String?)
+        .whereType<String>()
+        .toList();
+    await Future.wait(urls.map((u) async {
+      try {
+        await precacheImage(NetworkImage(u), context);
+      } catch (_) {}
+    }));
   }
 
   Future<void> _loadSavedAddresses() async {
@@ -204,6 +228,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _openPaymentSheet() async {
     HapticFeedback.selectionClick();
+    if (_iconsPrecache != null) {
+      await _iconsPrecache;
+    }
+    if (!mounted) return;
     final picked = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -514,6 +542,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         onPlace: _placeOrder,
         paymentLabel: _paymentLabel(),
         onChangePayment: _openPaymentSheet,
+        addressCtrl: _addressCtrl,
       ),
       body: empty
           ? const _EmptyCart()
@@ -1218,12 +1247,14 @@ class _StickyCheckoutBar extends StatelessWidget {
   final VoidCallback onPlace;
   final String paymentLabel;
   final VoidCallback onChangePayment;
+  final TextEditingController addressCtrl;
   const _StickyCheckoutBar({
     required this.cart,
     required this.placing,
     required this.onPlace,
     required this.paymentLabel,
     required this.onChangePayment,
+    required this.addressCtrl,
   });
 
   int get _savedCents {
@@ -1269,6 +1300,52 @@ class _StickyCheckoutBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: addressCtrl,
+              builder: (_, value, __) {
+                final addr = value.text.trim();
+                if (addr.isEmpty) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.pageBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.borderSoft),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on_outlined,
+                            size: 16, color: AppColors.inkMuted),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: RichText(
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            text: TextSpan(
+                              style: const TextStyle(
+                                color: AppColors.ink,
+                                fontSize: 13,
+                              ),
+                              children: [
+                                const TextSpan(text: 'Delivering to '),
+                                TextSpan(
+                                  text: addr,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Container(
