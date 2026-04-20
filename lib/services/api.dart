@@ -244,4 +244,16 @@ class ApiService {
     return Map<String, dynamic>.from(data);
   }
 
+  // Ask the server to mint a Razorpay UPI intent URL that launches PhonePe /
+  // GPay / Paytm directly with the amount pre-filled. Returns
+  // {intentUrl, paymentId}.
+  static Future<Map<String, dynamic>> createUpiIntent({
+    required String publicOrderId,
+    required String upiApp,
+  }) async {
+    final data = await _req('POST', '/payments/upi-intent',
+        body: {'publicOrderId': publicOrderId, 'upiApp': upiApp}, auth: true);
+    return Map<String, dynamic>.from(data);
+  }
+
 }

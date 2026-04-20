@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/models.dart';
 import '../../providers/home_provider.dart';
@@ -97,12 +98,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     'paytm': 'paytm',
   };
 
-  static String _upiAppLabel(String app) {
-    if (app == 'phonepe') return 'PhonePe';
-    if (app == 'google_pay') return 'Google Pay';
-    return 'Paytm';
-  }
-
   @override
   void initState() {
     super.initState();
@@ -175,9 +170,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  // Standard Checkout (cards / netbanking / other UPI). Returns the three
+  // razorpay_* fields the server needs to verify a successful payment.
   Future<Map<String, String>> _runRazorpay({
     required int amountCents,
-    String? preferredUpiApp,
   }) async {
     final intent = await ApiService.createPaymentIntent(amountCents);
     final razorpay = Razorpay();
@@ -212,30 +208,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       },
       'theme': {'color': '#10b981'},
     };
-    if (preferredUpiApp != null) {
-      options['method'] = {
-        'upi': true,
-        'card': false,
-        'netbanking': false,
-        'wallet': false,
-        'emi': false,
-        'paylater': false,
-      };
-      options['config'] = {
-        'display': {
-          'blocks': {
-            'upi_preferred': {
-              'name': 'Pay via ${_upiAppLabel(preferredUpiApp)}',
-              'instruments': [
-                {'method': 'upi', 'flows': ['intent'], 'apps': [preferredUpiApp]},
-              ],
-            },
-          },
-          'sequence': ['block.upi_preferred'],
-          'preferences': {'show_default_blocks': false},
-        },
-      };
-    }
     razorpay.open(options);
     try {
       return await completer.future;
@@ -261,20 +233,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _error = '';
     });
     try {
-      // phonepe/gpay/paytm are UI-only selections. They map to the same
-      // wire-level 'razorpay' payment method + a preferred UPI app that
-      // Razorpay's widget uses to launch only that app via intent flow.
+      // phonepe / gpay / paytm → Razorpay S2S UPI Intent API: mint a URL
+      // that launches the specific UPI app with the amount pre-filled. The
+      // webhook flips the order to paid once Razorpay confirms capture.
+      // razorpay → Standard Checkout (cards, netbanking, other UPI apps).
       final preferredUpiApp = _upiAppMap[_payment];
-      final isOnline = _payment == 'razorpay' || preferredUpiApp != null;
+      final isIntent = preferredUpiApp != null;
+      final isWidget = _payment == 'razorpay';
+      final isOnline = isIntent || isWidget;
       final wirePaymentMethod = isOnline ? 'razorpay' : _payment;
 
       Map<String, String>? rzp;
-      if (isOnline) {
-        rzp = await _runRazorpay(
-          amountCents: cart.grandTotalCents,
-          preferredUpiApp: preferredUpiApp,
-        );
+      String? pendingRazorpayOrderId;
+      if (isWidget) {
+        rzp = await _runRazorpay(amountCents: cart.grandTotalCents);
+      } else if (isIntent) {
+        final intent =
+            await ApiService.createPaymentIntent(cart.grandTotalCents);
+        pendingRazorpayOrderId = intent['razorpayOrderId'] as String?;
       }
+
       final order = await ApiService.createOrder({
         'customerName': _nameCtrl.text.trim(),
         'customerPhone': _phoneCtrl.text.trim(),
@@ -288,7 +266,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'deliveryLatitude': _lat,
         'deliveryLongitude': _lng,
         'couponCode': cart.appliedCoupon?.code,
-        'razorpayOrderId': rzp?['razorpayOrderId'],
+        'razorpayOrderId': rzp?['razorpayOrderId'] ?? pendingRazorpayOrderId,
         'razorpayPaymentId': rzp?['razorpayPaymentId'],
         'razorpaySignature': rzp?['razorpaySignature'],
         'items': cart.items.values
@@ -296,6 +274,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 {'productId': i.product.uniqueId, 'quantity': i.quantity})
             .toList(),
       });
+
+      if (isIntent) {
+        try {
+          final launch = await ApiService.createUpiIntent(
+            publicOrderId: order.publicId,
+            upiApp: preferredUpiApp,
+          );
+          final url = launch['intentUrl'] as String?;
+          if (url != null && url.isNotEmpty) {
+            await launchUrl(
+              Uri.parse(url),
+              mode: LaunchMode.externalApplication,
+            );
+          }
+        } catch (e) {
+          // Non-fatal — the order is already placed. User can retry from the
+          // track page.
+          if (mounted) setState(() => _error = e.toString());
+        }
+      }
+
       cart.clear();
       if (mounted) {
         Navigator.pushReplacement(
