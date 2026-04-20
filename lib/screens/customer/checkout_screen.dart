@@ -55,7 +55,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'sub': 'Opens PhonePe directly via UPI',
       'icon': Icons.account_balance_wallet_outlined,
       'iconUrl':
-          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/phonepay.png',
+          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/payment-icons/phonepay.png',
     },
     {
       'value': 'gpay',
@@ -63,7 +63,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'sub': 'Opens GPay directly via UPI',
       'icon': Icons.account_balance_wallet_outlined,
       'iconUrl':
-          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/googlepay.png',
+          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/payment-icons/googlepay.png',
     },
     {
       'value': 'paytm',
@@ -71,7 +71,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'sub': 'Opens Paytm directly via UPI',
       'icon': Icons.account_balance_wallet_outlined,
       'iconUrl':
-          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/paytm.png',
+          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/payment-icons/paytm.png',
     },
     {
       'value': 'razorpay',
