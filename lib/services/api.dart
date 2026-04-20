@@ -173,6 +173,13 @@ class ApiService {
         .toList();
   }
 
+  static Future<Campaign?> getActiveCampaign() async {
+    final data = await _req('GET', '/campaigns/active');
+    final raw = data['campaign'];
+    if (raw == null) return null;
+    return Campaign.fromJson(raw as Map<String, dynamic>);
+  }
+
   static Future<List<Brand>> getBrands() async {
     final data = await _req('GET', '/brands');
     return ((data['brands'] ?? []) as List)

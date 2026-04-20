@@ -32,6 +32,10 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   Timer? _hintRotator;
   int _hintIndex = 0;
 
+  // Popup overlay is shown at most once per app session.
+  static bool _campaignShownThisSession = false;
+  int? _lastCampaignSeenId;
+
   static const List<String> _searchHints = [
     'Search "milk"',
     'Search "bread"',
@@ -82,6 +86,43 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     }
   }
 
+  void _maybeShowCampaignPopup(HomeProvider home) {
+    final c = home.activeCampaign;
+    if (c == null || c.imageUrl == null || c.imageUrl!.isEmpty) return;
+    if (_campaignShownThisSession) return;
+    if (_lastCampaignSeenId == c.id) return;
+    _lastCampaignSeenId = c.id;
+    _campaignShownThisSession = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierColor: Colors.black.withValues(alpha: 0.72),
+        builder: (dialogCtx) => _CampaignOverlay(
+          campaign: c,
+          onTap: () {
+            Navigator.of(dialogCtx).pop();
+            final cid = c.categoryId;
+            if (cid != null) {
+              context.read<HomeProvider>().setCategory(cid);
+              _scrollCtrl.animateTo(
+                0,
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOut,
+              );
+            }
+          },
+          onClose: () => Navigator.of(dialogCtx).pop(),
+        ),
+      ).then((_) {
+        if (mounted) {
+          context.read<HomeProvider>().consumeActiveCampaign();
+        }
+      });
+    });
+  }
+
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
@@ -94,6 +135,8 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final home = context.watch<HomeProvider>();
+
+    _maybeShowCampaignPopup(home);
 
     return Scaffold(
       backgroundColor: AppColors.pageBg,
@@ -1278,4 +1321,72 @@ class _EmptyView extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _CampaignOverlay extends StatelessWidget {
+  const _CampaignOverlay({
+    required this.campaign,
+    required this.onTap,
+    required this.onClose,
+  });
+
+  final Campaign campaign;
+  final VoidCallback onTap;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: GestureDetector(
+              onTap: onTap,
+              child: Image.network(
+                campaign.imageUrl!,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Container(
+                    color: Colors.black,
+                    width: 300,
+                    height: 380,
+                    alignment: Alignment.center,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Colors.white70),
+                    ),
+                  );
+                },
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Material(
+              color: Colors.black.withValues(alpha: 0.55),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onClose,
+                child: const SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Icon(Icons.close, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

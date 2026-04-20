@@ -223,6 +223,36 @@ class Category {
       );
 }
 
+class Campaign {
+  final int id;
+  final String title;
+  final String? imageUrl;
+  final int? categoryId;
+  final String? categorySlug;
+  final String? categoryName;
+  final bool isActive;
+
+  Campaign({
+    required this.id,
+    required this.title,
+    this.imageUrl,
+    this.categoryId,
+    this.categorySlug,
+    this.categoryName,
+    required this.isActive,
+  });
+
+  factory Campaign.fromJson(Map<String, dynamic> j) => Campaign(
+        id: j['id'],
+        title: (j['title'] ?? '').toString(),
+        imageUrl: j['imageUrl'],
+        categoryId: j['categoryId'],
+        categorySlug: j['categorySlug'],
+        categoryName: j['categoryName'],
+        isActive: j['isActive'] ?? false,
+      );
+}
+
 class CategoryRail {
   final int id;
   final String name;

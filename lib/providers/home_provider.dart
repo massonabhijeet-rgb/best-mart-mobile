@@ -14,6 +14,7 @@ class HomeProvider extends ChangeNotifier {
   StorefrontSpotlight? _spotlight;
   List<TempCategory> _tempCategories = [];
   List<Brand> _brands = [];
+  Campaign? _activeCampaign;
 
   String _search = '';
   int? _categoryId;
@@ -34,6 +35,12 @@ class HomeProvider extends ChangeNotifier {
   StorefrontSpotlight? get spotlight => _spotlight;
   List<TempCategory> get tempCategories => _tempCategories;
   List<Brand> get brands => _brands;
+  Campaign? get activeCampaign => _activeCampaign;
+  void consumeActiveCampaign() {
+    if (_activeCampaign == null) return;
+    _activeCampaign = null;
+    notifyListeners();
+  }
 
   String get search => _search;
   int? get categoryId => _categoryId;
@@ -62,6 +69,7 @@ class HomeProvider extends ChangeNotifier {
             )),
         ApiService.getTempCategories().catchError((_) => <TempCategory>[]),
         ApiService.getBrands().catchError((_) => <Brand>[]),
+        ApiService.getActiveCampaign().catchError((_) => null),
       ]);
       final rawRails = results[0] as HomeRails;
       _rails = HomeRails(
@@ -95,6 +103,7 @@ class HomeProvider extends ChangeNotifier {
               ))
           .toList();
       _brands = results[5] as List<Brand>;
+      _activeCampaign = results[6] as Campaign?;
       _state = LoadState.ready;
       notifyListeners();
       await _resetGrid();
