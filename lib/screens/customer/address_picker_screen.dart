@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../models/models.dart';
 import '../../theme/tokens.dart';
 
 /// Result returned from [AddressPickerScreen.open]. The picker collects both
@@ -19,6 +20,10 @@ class PickedAddress {
   final String phone;
   final String addressLine;
   final String? deliveryNotes;
+  // Non-null when the user picked a pre-existing saved address from the list
+  // under the map; the checkout screen uses this to re-select the saved entry
+  // instead of treating the result as a brand-new draft.
+  final int? savedAddressId;
 
   const PickedAddress({
     required this.latitude,
@@ -27,6 +32,7 @@ class PickedAddress {
     required this.phone,
     required this.addressLine,
     this.deliveryNotes,
+    this.savedAddressId,
   });
 }
 
@@ -42,6 +48,10 @@ class AddressPickerScreen extends StatefulWidget {
   final String initialPhone;
   final String initialNotes;
   final bool fetchCurrentLocationOnOpen;
+  // Rendered as tappable tiles beneath the map so the user can skip the
+  // map+form dance and reuse a prior address in one tap.
+  final List<SavedAddress> savedAddresses;
+  final int? selectedSavedAddressId;
 
   const AddressPickerScreen({
     super.key,
@@ -52,6 +62,8 @@ class AddressPickerScreen extends StatefulWidget {
     this.initialPhone = '',
     this.initialNotes = '',
     this.fetchCurrentLocationOnOpen = false,
+    this.savedAddresses = const [],
+    this.selectedSavedAddressId,
   });
 
   static Future<PickedAddress?> open(
@@ -63,6 +75,8 @@ class AddressPickerScreen extends StatefulWidget {
     String initialPhone = '',
     String initialNotes = '',
     bool fetchCurrentLocationOnOpen = false,
+    List<SavedAddress> savedAddresses = const [],
+    int? selectedSavedAddressId,
   }) {
     return Navigator.of(context).push<PickedAddress>(
       MaterialPageRoute(
@@ -74,6 +88,8 @@ class AddressPickerScreen extends StatefulWidget {
           initialPhone: initialPhone,
           initialNotes: initialNotes,
           fetchCurrentLocationOnOpen: fetchCurrentLocationOnOpen,
+          savedAddresses: savedAddresses,
+          selectedSavedAddressId: selectedSavedAddressId,
         ),
       ),
     );
@@ -164,108 +180,129 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
     Navigator.of(context).pop(picked);
   }
 
+  void _pickSaved(SavedAddress a) {
+    Navigator.of(context).pop(
+      PickedAddress(
+        latitude: a.latitude ?? _pinned.latitude,
+        longitude: a.longitude ?? _pinned.longitude,
+        fullName: a.fullName,
+        phone: a.phone,
+        addressLine: a.deliveryAddress,
+        deliveryNotes: a.deliveryNotes,
+        savedAddressId: a.id,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    // Cap the map height so the saved-address list below always peeks — on
+    // very tall screens we don't want the map to swallow everything.
+    final mapHeight = screenHeight * 0.42;
+    final saved = widget.savedAddresses;
     return Scaffold(
       backgroundColor: AppColors.pageBg,
       appBar: AppBar(
         title: const Text('Pin your delivery location'),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                FlutterMap(
-                  mapController: _mapCtrl,
-                  options: MapOptions(
-                    initialCenter: _pinned,
-                    initialZoom: 16,
-                    minZoom: 4,
-                    maxZoom: 19,
-                    onPositionChanged: (pos, _) {
-                      final c = pos.center;
-                      if (c.latitude != _pinned.latitude ||
-                          c.longitude != _pinned.longitude) {
-                        setState(() => _pinned = c);
-                      }
-                    },
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.bestmart.mobile',
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: mapHeight,
+              child: Stack(
+                children: [
+                  FlutterMap(
+                    mapController: _mapCtrl,
+                    options: MapOptions(
+                      initialCenter: _pinned,
+                      initialZoom: 16,
+                      minZoom: 4,
+                      maxZoom: 19,
+                      onPositionChanged: (pos, _) {
+                        final c = pos.center;
+                        if (c.latitude != _pinned.latitude ||
+                            c.longitude != _pinned.longitude) {
+                          setState(() => _pinned = c);
+                        }
+                      },
                     ),
-                  ],
-                ),
-                // Center pin — overlay, not a Marker, so it stays fixed at
-                // the viewport centre while the user pans the map.
-                const IgnorePointer(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: 32),
-                      child: Icon(
-                        Icons.location_on,
-                        color: AppColors.brandBlue,
-                        size: 48,
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.bestmart.mobile',
+                      ),
+                    ],
+                  ),
+                  // Center pin — overlay, not a Marker, so it stays fixed at
+                  // the viewport centre while the user pans the map.
+                  const IgnorePointer(
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.only(bottom: 32),
+                        child: Icon(
+                          Icons.location_on,
+                          color: AppColors.brandBlue,
+                          size: 48,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  right: 12,
-                  bottom: 12,
-                  child: FloatingActionButton.small(
-                    heroTag: 'locate',
-                    onPressed: _locating ? null : _fetchCurrentLocation,
-                    backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.brandBlue,
-                    child: _locating
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.my_location),
-                  ),
-                ),
-                Positioned(
-                  left: 12,
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: AppShadow.soft,
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: FloatingActionButton.small(
+                      heroTag: 'locate',
+                      onPressed: _locating ? null : _fetchCurrentLocation,
+                      backgroundColor: AppColors.surface,
+                      foregroundColor: AppColors.brandBlue,
+                      child: _locating
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.my_location),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline,
-                            size: 16, color: AppColors.inkMuted),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            'Drag the map to move the pin',
-                            style: TextStyle(
-                              color: AppColors.ink,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                  ),
+                  Positioned(
+                    left: 12,
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: AppShadow.soft,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline,
+                              size: 16, color: AppColors.inkMuted),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Drag the map to move the pin',
+                              style: TextStyle(
+                                color: AppColors.ink,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          SafeArea(
-            top: false,
+          SliverToBoxAdapter(
             child: Container(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
@@ -278,13 +315,6 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
                 border: Border(
                   top: BorderSide(color: AppColors.borderSoft),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 12,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -320,20 +350,22 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
                   const SizedBox(height: AppSpacing.sm),
                   SizedBox(
                     height: 48,
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
                       onPressed: _continueToDetails,
+                      icon: const Icon(Icons.add_location_alt_outlined,
+                          size: 18),
+                      label: const Text(
+                        'Use this location',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.brandBlue,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: AppRadius.brMd,
-                        ),
-                      ),
-                      child: const Text(
-                        'Continue',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
                         ),
                       ),
                     ),
@@ -342,7 +374,183 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
               ),
             ),
           ),
+          if (saved.isNotEmpty) ...[
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.xs,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.bookmark_border,
+                        size: 16, color: AppColors.inkMuted),
+                    SizedBox(width: 6),
+                    Text(
+                      'SAVED ADDRESSES',
+                      style: TextStyle(
+                        color: AppColors.inkMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final a = saved[index];
+                  final isCurrent = widget.selectedSavedAddressId == a.id;
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      0,
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                    ),
+                    child: _SavedAddressTile(
+                      address: a,
+                      isCurrent: isCurrent,
+                      onTap: () => _pickSaved(a),
+                    ),
+                  );
+                },
+                childCount: saved.length,
+              ),
+            ),
+          ],
+          const SliverToBoxAdapter(
+            child: SizedBox(height: AppSpacing.md),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _SavedAddressTile extends StatelessWidget {
+  final SavedAddress address;
+  final bool isCurrent;
+  final VoidCallback onTap;
+  const _SavedAddressTile({
+    required this.address,
+    required this.isCurrent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: AppRadius.brMd,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.brMd,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.brMd,
+            border: Border.all(
+              color: isCurrent ? AppColors.brandBlue : AppColors.borderSoft,
+              width: isCurrent ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.brandBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.location_on_outlined,
+                  color: AppColors.brandBlue,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            address.fullName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        if (isCurrent)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.brandBlue
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Text(
+                              'CURRENT',
+                              style: TextStyle(
+                                color: AppColors.brandBlueDark,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      address.deliveryAddress,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.inkMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      address.phone,
+                      style: const TextStyle(
+                        color: AppColors.inkFaint,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.inkFaint,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

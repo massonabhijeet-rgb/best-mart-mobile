@@ -169,17 +169,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.dispose();
   }
 
-  Future<void> _openAddressPicker({required bool useCurrentLocation}) async {
+  Future<void> _openAddressPicker({
+    required bool useCurrentLocation,
+    bool clearFields = false,
+  }) async {
     HapticFeedback.selectionClick();
     final picked = await AddressPickerScreen.open(
       context,
-      initialLatitude: _lat,
-      initialLongitude: _lng,
-      initialAddressLine: _addressCtrl.text,
-      initialFullName: _nameCtrl.text,
-      initialPhone: _phoneCtrl.text,
-      initialNotes: _notesCtrl.text,
+      initialLatitude: clearFields ? null : _lat,
+      initialLongitude: clearFields ? null : _lng,
+      initialAddressLine: clearFields ? '' : _addressCtrl.text,
+      initialFullName: clearFields ? '' : _nameCtrl.text,
+      initialPhone: clearFields ? '' : _phoneCtrl.text,
+      initialNotes: clearFields ? '' : _notesCtrl.text,
       fetchCurrentLocationOnOpen: useCurrentLocation,
+      savedAddresses: _savedAddresses,
+      selectedSavedAddressId: _selectedAddressId,
     );
     if (!mounted || picked == null) return;
     setState(() {
@@ -189,7 +194,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _nameCtrl.text = picked.fullName;
       _phoneCtrl.text = picked.phone;
       _notesCtrl.text = picked.deliveryNotes ?? '';
-      _selectedAddressId = null;
+      // If the user chose one of their saved addresses from the list below
+      // the map, re-select it; otherwise treat the result as a fresh draft.
+      _selectedAddressId = picked.savedAddressId;
     });
   }
 
@@ -203,6 +210,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   IconData _paymentIcon() => _paymentEntry()['icon'] as IconData;
 
   String? _paymentIconUrl() => _paymentEntry()['iconUrl'] as String?;
+
+  bool get _hasValidAddress =>
+      _selectedAddressId != null ||
+      (_addressCtrl.text.trim().isNotEmpty && _lat != null && _lng != null);
+
+  // First chunk of the address (before the first comma) doubles as a short
+  // "Home / Work / PG" style label for the sticky bar header.
+  String get _selectedAddressLabel {
+    final line = _addressCtrl.text.trim();
+    if (line.isEmpty) return 'your address';
+    final head = line.split(',').first.trim();
+    return head.isEmpty ? line : head;
+  }
 
   // Groups used in the payment bottom sheet. Order within each group mirrors
   // the `_payMethods` master list so defaults stay stable.
@@ -332,6 +352,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _openCouponSheet() async {
     HapticFeedback.selectionClick();
+    // Kick off the user-specific list as soon as the sheet opens; the
+    // FutureBuilder inside the sheet shows a spinner until it resolves.
+    final availableFuture = ApiService.getAvailableCoupons();
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -390,20 +413,77 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             child: const CouponInput(),
                           ),
                         ),
-                        Consumer<HomeProvider>(
-                          builder: (_, home, __) {
-                            if (home.coupons.isEmpty) {
-                              return const SizedBox.shrink();
-                            }
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.only(top: AppSpacing.sm),
-                              child: PublicCouponCarousel(
-                                coupons: home.coupons,
-                                onApply: (code) => context
-                                    .read<CartProvider>()
-                                    .applyCoupon(code),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.md,
+                            AppSpacing.md,
+                            AppSpacing.md,
+                            AppSpacing.xs,
+                          ),
+                          child: Row(
+                            children: const [
+                              Icon(Icons.local_offer_outlined,
+                                  size: 16, color: AppColors.inkMuted),
+                              SizedBox(width: 6),
+                              Text(
+                                'AVAILABLE FOR YOU',
+                                style: TextStyle(
+                                  color: AppColors.inkMuted,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.6,
+                                ),
                               ),
+                            ],
+                          ),
+                        ),
+                        FutureBuilder<List<Coupon>>(
+                          future: availableFuture,
+                          builder: (_, snap) {
+                            if (snap.connectionState !=
+                                ConnectionState.done) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.4,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            final list = snap.data ?? const <Coupon>[];
+                            if (list.isEmpty) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: AppSpacing.md,
+                                ),
+                                child: Text(
+                                  'No coupons available for you right now. '
+                                  'Check back later — or enter a code above '
+                                  'if you have one.',
+                                  style: TextStyle(
+                                    color: AppColors.inkMuted,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              );
+                            }
+                            return PublicCouponCarousel(
+                              coupons: list,
+                              onApply: (code) async {
+                                final ok = await context
+                                    .read<CartProvider>()
+                                    .applyCoupon(code);
+                                if (ok && sheetContext.mounted) {
+                                  Navigator.of(sheetContext).pop();
+                                }
+                                return ok;
+                              },
                             );
                           },
                         ),
@@ -622,7 +702,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         onPlace: _placeOrder,
         paymentLabel: _paymentLabel(),
         onChangePayment: _openPaymentSheet,
-        addressCtrl: _addressCtrl,
+        hasAddress: _hasValidAddress,
+        addressLine: _addressCtrl.text,
+        addressLabel: _selectedAddressLabel,
+        paymentIcon: _paymentIcon(),
+        paymentIconUrl: _paymentIconUrl(),
+        onChangeAddress: _hasValidAddress
+            ? () => _openAddressPicker(useCurrentLocation: false)
+            : () => _openAddressPicker(
+                  useCurrentLocation: true,
+                  clearFields: true,
+                ),
+        onAddAddress: () => _openAddressPicker(
+          useCurrentLocation: true,
+          clearFields: true,
+        ),
       ),
       body: empty
           ? const _EmptyCart()
@@ -636,9 +730,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const _EtaHero(),
+                  const SizedBox(height: AppSpacing.md),
                   _Section(
                     title: 'Your cart',
                     icon: Icons.shopping_bag_outlined,
+                    trailing: _CountChip(count: cart.totalItems),
                     child: Column(
                       children: cart.items.values
                           .map((item) => _CartLine(item: item))
@@ -655,32 +752,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     title: 'Bill details',
                     icon: Icons.receipt_long_outlined,
                     child: BillSummary(cart: cart),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  const SizedBox(height: AppSpacing.md),
-                  _Section(
-                    title: 'Deliver to',
-                    icon: Icons.home_outlined,
-                    child: _AddressSelector(
-                      savedAddresses: _savedAddresses,
-                      selectedAddressId: _selectedAddressId,
-                      hasDraft: _addressCtrl.text.trim().isNotEmpty &&
-                          _lat != null &&
-                          _lng != null,
-                      draftAddressLine: _addressCtrl.text,
-                      draftName: _nameCtrl.text,
-                      draftPhone: _phoneCtrl.text,
-                      latitude: _lat,
-                      longitude: _lng,
-                      onSelect: (a) {
-                        HapticFeedback.selectionClick();
-                        _applyAddress(a);
-                      },
-                      onAddNew: () =>
-                          _openAddressPicker(useCurrentLocation: true),
-                      onEditDraft: () =>
-                          _openAddressPicker(useCurrentLocation: false),
-                    ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _PaymentSummaryCard(
@@ -867,10 +938,12 @@ class _Section extends StatelessWidget {
   final String title;
   final IconData icon;
   final Widget child;
+  final Widget? trailing;
   const _Section({
     required this.title,
     required this.icon,
     required this.child,
+    this.trailing,
   });
 
   @override
@@ -889,14 +962,17 @@ class _Section extends StatelessWidget {
               children: [
                 Icon(icon, color: AppColors.brandBlue, size: 18),
                 const SizedBox(width: AppSpacing.sm),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    color: AppColors.ink,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      color: AppColors.ink,
+                    ),
                   ),
                 ),
+                if (trailing != null) trailing!,
               ],
             ),
             const SizedBox(height: AppSpacing.md),
@@ -904,6 +980,122 @@ class _Section extends StatelessWidget {
           ],
         ),
       );
+}
+
+class _CountChip extends StatelessWidget {
+  final int count;
+  const _CountChip({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.brandBlue.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$count item${count == 1 ? '' : 's'}',
+        style: const TextStyle(
+          color: AppColors.brandBlueDark,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+class _EtaHero extends StatelessWidget {
+  const _EtaHero();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.brandBlue, AppColors.brandBlueDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: AppRadius.brMd,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.brandBlue.withValues(alpha: 0.25),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.electric_bolt_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Express delivery',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Arriving in 10–15 mins',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text(
+              'FREE pkg',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PaymentSummaryCard extends StatelessWidget {
@@ -1131,44 +1323,34 @@ class _StickyCheckoutBar extends StatelessWidget {
   final bool placing;
   final VoidCallback onPlace;
   final String paymentLabel;
+  final IconData paymentIcon;
+  final String? paymentIconUrl;
   final VoidCallback onChangePayment;
-  final TextEditingController addressCtrl;
+  final bool hasAddress;
+  final String addressLine;
+  final String addressLabel;
+  final VoidCallback onChangeAddress;
+  final VoidCallback onAddAddress;
   const _StickyCheckoutBar({
     required this.cart,
     required this.placing,
     required this.onPlace,
     required this.paymentLabel,
+    required this.paymentIcon,
+    required this.paymentIconUrl,
     required this.onChangePayment,
-    required this.addressCtrl,
+    required this.hasAddress,
+    required this.addressLine,
+    required this.addressLabel,
+    required this.onChangeAddress,
+    required this.onAddAddress,
   });
-
-  int get _savedCents {
-    final itemSavings = cart.items.values.fold<int>(0, (s, item) {
-      final p = item.product;
-      final orig = p.originalPriceCents;
-      if (orig == null || orig <= p.priceCents) return s;
-      return s + (orig - p.priceCents) * item.quantity;
-    });
-    final freeDelivery =
-        cart.subtotalCents >= CartProvider.freeDeliveryThresholdCents;
-    return itemSavings +
-        cart.promoDiscountCents +
-        cart.couponDiscountCents +
-        (freeDelivery ? CartProvider.deliveryFeeCents : 0);
-  }
 
   @override
   Widget build(BuildContext context) {
-    final saved = _savedCents;
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.sm,
-          AppSpacing.md,
-          AppSpacing.sm,
-        ),
         decoration: BoxDecoration(
           color: AppColors.surface,
           border: Border(
@@ -1185,206 +1367,242 @@ class _StickyCheckoutBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: addressCtrl,
-              builder: (_, value, __) {
-                final addr = value.text.trim();
-                if (addr.isEmpty) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.pageBg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.borderSoft),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined,
-                            size: 16, color: AppColors.inkMuted),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: RichText(
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            text: TextSpan(
-                              style: const TextStyle(
-                                color: AppColors.ink,
-                                fontSize: 13,
-                              ),
-                              children: [
-                                const TextSpan(text: 'Delivering to '),
-                                TextSpan(
-                                  text: addr,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w700),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+            _DeliveryHeaderStrip(
+              hasAddress: hasAddress,
+              addressLabel: addressLabel,
+              addressLine: addressLine,
+              onTap: placing
+                  ? () {}
+                  : (hasAddress ? onChangeAddress : onAddAddress),
             ),
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.pageBg,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.borderSoft),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.account_balance_wallet_outlined,
-                        size: 16, color: AppColors.inkMuted),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: RichText(
-                        overflow: TextOverflow.ellipsis,
-                        text: TextSpan(
-                          style: const TextStyle(
-                            color: AppColors.ink,
-                            fontSize: 13,
-                          ),
-                          children: [
-                            const TextSpan(text: 'Paying via '),
-                            TextSpan(
-                              text: paymentLabel,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: placing ? null : onChangePayment,
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: const Size(0, 32),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: const Text(
-                        'Change',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: AppColors.brandBlue,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.sm,
               ),
-            ),
-            if (saved > 0)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    const Icon(Icons.savings_outlined,
-                        color: AppColors.brandGreen, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Saving ₹${(saved / 100).toStringAsFixed(0)} on this order',
-                      style: const TextStyle(
-                        color: AppColors.brandGreenDark,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: placing
-                      ? null
-                      : () {
-                          HapticFeedback.mediumImpact();
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _PayUsingButton(
+                    label: paymentLabel,
+                    icon: paymentIcon,
+                    iconUrl: paymentIconUrl,
+                    onTap: placing ? () {} : onChangePayment,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _PlaceOrderPill(
+                      placing: placing,
+                      hasAddress: hasAddress,
+                      totalCents: cart.grandTotalCents,
+                      onTap: () {
+                        HapticFeedback.mediumImpact();
+                        if (!hasAddress) {
+                          onAddAddress();
+                        } else {
                           onPlace();
-                        },
-                  borderRadius: AppRadius.brMd,
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: placing
-                            ? [AppColors.inkFaint, AppColors.inkFaint]
-                            : [AppColors.brandBlue, AppColors.brandBlueDark],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: AppRadius.brMd,
-                      boxShadow: placing
-                          ? null
-                          : [
-                              BoxShadow(
-                                color: AppColors.brandBlue
-                                    .withValues(alpha: 0.4),
-                                blurRadius: 14,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                    ),
-                    child: Center(
-                      child: placing
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.4,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'Place Order',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 15,
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  width: 4,
-                                  height: 4,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '₹${(cart.grandTotalCents / 100).toStringAsFixed(0)}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Icon(Icons.arrow_forward_rounded,
-                                    color: Colors.white, size: 18),
-                              ],
-                            ),
+                        }
+                      },
                     ),
                   ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeliveryHeaderStrip extends StatelessWidget {
+  final bool hasAddress;
+  final String addressLabel;
+  final String addressLine;
+  final VoidCallback onTap;
+  const _DeliveryHeaderStrip({
+    required this.hasAddress,
+    required this.addressLabel,
+    required this.addressLine,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.brandGreen.withValues(alpha: 0.06),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: 10,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.brandOrange.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  hasAddress
+                      ? Icons.apartment_rounded
+                      : Icons.add_location_alt_outlined,
+                  color: AppColors.brandOrangeDark,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RichText(
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        style: const TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 13,
+                        ),
+                        children: [
+                          const TextSpan(text: 'Delivering to '),
+                          TextSpan(
+                            text: hasAddress ? addressLabel : 'add address',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (hasAddress && addressLine.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        addressLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.inkMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                hasAddress ? 'Change' : 'Add',
+                style: const TextStyle(
+                  color: AppColors.brandGreenDark,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PayUsingButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final String? iconUrl;
+  final VoidCallback onTap;
+  const _PayUsingButton({
+    required this.label,
+    required this.icon,
+    required this.iconUrl,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: iconUrl != null
+                        ? AppColors.surface
+                        : AppColors.brandBlue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: iconUrl != null
+                        ? Border.all(color: AppColors.borderSoft)
+                        : null,
+                  ),
+                  child: iconUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.all(2),
+                            child: Image.network(
+                              iconUrl!,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Icon(
+                                icon,
+                                color: AppColors.brandBlue,
+                                size: 14,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Icon(icon, color: AppColors.brandBlue, size: 14),
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'PAY USING',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(
+                  Icons.keyboard_arrow_up_rounded,
+                  size: 16,
+                  color: AppColors.ink,
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 110),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.inkMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -1394,245 +1612,136 @@ class _StickyCheckoutBar extends StatelessWidget {
     );
   }
 }
-class _AddressSelector extends StatelessWidget {
-  final List<SavedAddress> savedAddresses;
-  final int? selectedAddressId;
-  final bool hasDraft;
-  final String draftAddressLine;
-  final String draftName;
-  final String draftPhone;
-  final double? latitude;
-  final double? longitude;
-  final ValueChanged<SavedAddress> onSelect;
-  final VoidCallback onAddNew;
-  final VoidCallback onEditDraft;
 
-  const _AddressSelector({
-    required this.savedAddresses,
-    required this.selectedAddressId,
-    required this.hasDraft,
-    required this.draftAddressLine,
-    required this.draftName,
-    required this.draftPhone,
-    required this.latitude,
-    required this.longitude,
-    required this.onSelect,
-    required this.onAddNew,
-    required this.onEditDraft,
+class _PlaceOrderPill extends StatelessWidget {
+  final bool placing;
+  final bool hasAddress;
+  final int totalCents;
+  final VoidCallback onTap;
+  const _PlaceOrderPill({
+    required this.placing,
+    required this.hasAddress,
+    required this.totalCents,
+    required this.onTap,
   });
-
-  // `-1` is the sentinel for the "+ Add new address" option in the dropdown.
-  static const int _kAddNewValue = -1;
 
   @override
   Widget build(BuildContext context) {
-    final SavedAddress? selected = selectedAddressId == null
-        ? null
-        : savedAddresses.firstWhere(
-            (a) => a.id == selectedAddressId,
-            orElse: () => savedAddresses.first,
-          );
+    final disabled = placing;
+    final addMode = !hasAddress;
+    final gradient = disabled
+        ? [AppColors.inkFaint, AppColors.inkFaint]
+        : addMode
+            ? [AppColors.brandOrange, AppColors.brandOrangeDark]
+            : [AppColors.brandGreen, AppColors.brandGreenDark];
+    final shadowColor =
+        addMode ? AppColors.brandOrange : AppColors.brandGreen;
 
-    if (savedAddresses.isEmpty && !hasDraft) {
-      return SizedBox(
-        height: 48,
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: onAddNew,
-          icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-          label: const Text(
-            'Add a delivery address',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.brandBlue,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: AppRadius.brMd),
+    return SizedBox(
+      height: 60,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: disabled ? null : onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: gradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: disabled
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: shadowColor.withValues(alpha: 0.4),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: placing
+                  ? const Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : addMode
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.add_location_alt_outlined,
+                                color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Add a delivery address',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '₹${(totalCents / 100).toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                    height: 1.1,
+                                  ),
+                                ),
+                                const Text(
+                                  'TOTAL',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 10,
+                                    letterSpacing: 0.6,
+                                    height: 1.1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Spacer(),
+                            const Text(
+                              'Place Order',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ],
+                        ),
+            ),
           ),
         ),
-      );
-    }
-
-    final int? dropdownValue = selectedAddressId ??
-        (hasDraft ? null : (savedAddresses.isNotEmpty ? savedAddresses.first.id : null));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (savedAddresses.isNotEmpty)
-          DropdownButtonFormField<int>(
-            initialValue: dropdownValue,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: 'Saved addresses',
-              border: OutlineInputBorder(borderRadius: AppRadius.brMd),
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-            ),
-            items: [
-              ...savedAddresses.map(
-                (a) => DropdownMenuItem<int>(
-                  value: a.id,
-                  child: Text(
-                    '${a.fullName} · ${a.phone} · ${a.deliveryAddress}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ),
-              ),
-              const DropdownMenuItem<int>(
-                value: _kAddNewValue,
-                child: Text(
-                  '+ Add a new address',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.brandBlue,
-                  ),
-                ),
-              ),
-            ],
-            onChanged: (value) {
-              if (value == null) return;
-              if (value == _kAddNewValue) {
-                onAddNew();
-                return;
-              }
-              final picked = savedAddresses.firstWhere((a) => a.id == value);
-              onSelect(picked);
-            },
-          ),
-        if (selected != null) ...[
-          const SizedBox(height: AppSpacing.sm),
-          _SummaryCard(
-            name: selected.fullName,
-            phone: selected.phone,
-            addressLine: selected.deliveryAddress,
-            latitude: selected.latitude,
-            longitude: selected.longitude,
-            onChange: onAddNew,
-            changeLabel: 'Add new',
-          ),
-        ] else if (hasDraft) ...[
-          const SizedBox(height: AppSpacing.sm),
-          _SummaryCard(
-            name: draftName,
-            phone: draftPhone,
-            addressLine: draftAddressLine,
-            latitude: latitude,
-            longitude: longitude,
-            onChange: onEditDraft,
-            changeLabel: 'Edit',
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _SummaryCard extends StatelessWidget {
-  final String name;
-  final String phone;
-  final String addressLine;
-  final double? latitude;
-  final double? longitude;
-  final VoidCallback onChange;
-  final String changeLabel;
-
-  const _SummaryCard({
-    required this.name,
-    required this.phone,
-    required this.addressLine,
-    required this.latitude,
-    required this.longitude,
-    required this.onChange,
-    required this.changeLabel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppRadius.brMd,
-        border: Border.all(color: AppColors.borderSoft),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.brandGreen.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.location_on,
-                color: AppColors.brandGreen, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (name.trim().isNotEmpty || phone.trim().isNotEmpty)
-                  Text(
-                    [name.trim(), phone.trim()]
-                        .where((s) => s.isNotEmpty)
-                        .join(' · '),
-                    style: const TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                const SizedBox(height: 2),
-                Text(
-                  addressLine.trim(),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.inkMuted,
-                    fontSize: 12,
-                    height: 1.3,
-                  ),
-                ),
-                if (latitude != null && longitude != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    '${latitude!.toStringAsFixed(5)}, ${longitude!.toStringAsFixed(5)}',
-                    style: const TextStyle(
-                      color: AppColors.inkFaint,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: onChange,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              minimumSize: const Size(0, 32),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              changeLabel,
-              style: const TextStyle(
-                color: AppColors.brandBlue,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

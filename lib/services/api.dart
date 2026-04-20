@@ -209,6 +209,15 @@ class ApiService {
         .toList();
   }
 
+  // Filtered to coupons the signed-in user can still apply (excludes codes
+  // where they've hit the per-user cap). Falls back to public if anonymous.
+  static Future<List<Coupon>> getAvailableCoupons() async {
+    final data = await _req('GET', '/coupons/available', auth: true);
+    return ((data['coupons'] ?? []) as List)
+        .map((c) => Coupon.fromJson(c))
+        .toList();
+  }
+
   static Future<CouponPreview> previewCoupon(
       String code, int subtotalCents) async {
     final data = await _req('POST', '/coupons/preview',
