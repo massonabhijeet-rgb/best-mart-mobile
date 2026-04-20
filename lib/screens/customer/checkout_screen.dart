@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -17,6 +16,7 @@ import '../../widgets/bill_summary.dart';
 import '../../widgets/checkout_deals.dart';
 import '../../widgets/coupon_input.dart';
 import '../../widgets/public_coupon_carousel.dart';
+import 'address_picker_screen.dart';
 import 'cart_provider.dart';
 import 'track_order_screen.dart';
 
@@ -37,7 +37,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _placing = false;
   String _error = '';
   double? _lat, _lng;
-  bool _fetchingLocation = false;
   List<SavedAddress> _savedAddresses = [];
   int? _selectedAddressId;
   final _paymentSectionKey = GlobalKey();
@@ -177,28 +176,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.dispose();
   }
 
-  Future<void> _fetchLocation() async {
-    setState(() => _fetchingLocation = true);
-    try {
-      final perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) {
-        setState(() {
-          _error = 'Location permission denied';
-          _fetchingLocation = false;
-        });
-        return;
-      }
-      final pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
-      setState(() {
-        _lat = pos.latitude;
-        _lng = pos.longitude;
-      });
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _fetchingLocation = false);
-    }
+  Future<void> _openAddressPicker({required bool useCurrentLocation}) async {
+    HapticFeedback.selectionClick();
+    final picked = await AddressPickerScreen.open(
+      context,
+      initialLatitude: _lat,
+      initialLongitude: _lng,
+      initialAddressLine: _addressCtrl.text,
+      fetchCurrentLocationOnOpen: useCurrentLocation,
+    );
+    if (!mounted || picked == null) return;
+    setState(() {
+      _lat = picked.latitude;
+      _lng = picked.longitude;
+      _addressCtrl.text = picked.addressLine;
+    });
   }
 
   Map<String, dynamic> _paymentEntry() => _payMethods.firstWhere(
@@ -336,6 +328,95 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (picked != null && picked != _payment) {
       setState(() => _payment = picked);
     }
+  }
+
+  Future<void> _openCouponSheet() async {
+    HapticFeedback.selectionClick();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.pageBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: DraggableScrollableSheet(
+            initialChildSize: 0.75,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            expand: false,
+            builder: (_, scrollCtrl) {
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Apply a coupon',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close,
+                              color: AppColors.inkMuted),
+                          onPressed: () =>
+                              Navigator.of(sheetContext).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.only(bottom: 16),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md),
+                          child: Container(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: AppRadius.brMd,
+                              border: Border.all(color: AppColors.borderSoft),
+                            ),
+                            child: const CouponInput(),
+                          ),
+                        ),
+                        Consumer<HomeProvider>(
+                          builder: (_, home, __) {
+                            if (home.coupons.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.only(top: AppSpacing.sm),
+                              child: PublicCouponCarousel(
+                                coupons: home.coupons,
+                                onApply: (code) => context
+                                    .read<CartProvider>()
+                                    .applyCoupon(code),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   static String _upiAppLabel(String app) {
@@ -567,33 +648,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   ..._buildDealsSection(cart),
                   const SizedBox(height: AppSpacing.md),
-                  Consumer<HomeProvider>(
-                    builder: (_, home, __) {
-                      if (home.coupons.isEmpty) return const SizedBox.shrink();
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: AppRadius.brMd,
-                            border: Border.all(color: AppColors.borderSoft),
-                            boxShadow: AppShadow.soft,
-                          ),
-                          padding: const EdgeInsets.only(
-                              bottom: AppSpacing.sm),
-                          child: PublicCouponCarousel(
-                            coupons: home.coupons,
-                            onApply: (code) =>
-                                context.read<CartProvider>().applyCoupon(code),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  _Section(
-                    title: 'Have another code?',
-                    icon: Icons.local_offer_outlined,
-                    child: const CouponInput(),
+                  _CouponEntryCard(
+                    onTap: _openCouponSheet,
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _Section(
@@ -624,9 +680,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ],
                   const SizedBox(height: AppSpacing.md),
                   _Section(
+                    title: 'Delivery location',
+                    icon: Icons.location_on_outlined,
+                    child: _LocationPickerCard(
+                      address: _addressCtrl.text,
+                      latitude: _lat,
+                      longitude: _lng,
+                      onUseCurrent: () =>
+                          _openAddressPicker(useCurrentLocation: true),
+                      onPickOnMap: () =>
+                          _openAddressPicker(useCurrentLocation: false),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _Section(
                     title: _savedAddresses.isNotEmpty
-                        ? 'Or enter a new address'
-                        : 'Delivery details',
+                        ? 'Your details (or enter new)'
+                        : 'Your details',
                     icon: Icons.person_outline,
                     child: Column(
                       children: [
@@ -634,27 +704,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         _field(_phoneCtrl, 'Phone number', TextInputType.phone),
                         _field(_emailCtrl, 'Email (optional)',
                             TextInputType.emailAddress),
-                        _field(_addressCtrl, 'Delivery address',
-                            TextInputType.streetAddress,
-                            maxLines: 2),
                         _field(_notesCtrl, 'Delivery notes (optional)',
                             TextInputType.text),
-                        const SizedBox(height: AppSpacing.sm),
-                        OutlinedButton.icon(
-                          onPressed:
-                              _fetchingLocation ? null : _fetchLocation,
-                          icon: _fetchingLocation
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2),
-                                )
-                              : const Icon(Icons.my_location),
-                          label: Text(_lat != null
-                              ? 'Location captured ✓'
-                              : 'Use my current location'),
-                        ),
                       ],
                     ),
                   ),
@@ -1653,4 +1704,267 @@ class _EmptyCart extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _LocationPickerCard extends StatelessWidget {
+  final String address;
+  final double? latitude;
+  final double? longitude;
+  final VoidCallback onUseCurrent;
+  final VoidCallback onPickOnMap;
+
+  const _LocationPickerCard({
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+    required this.onUseCurrent,
+    required this.onPickOnMap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasAddress =
+        address.trim().isNotEmpty && latitude != null && longitude != null;
+    if (hasAddress) {
+      return Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: AppRadius.brMd,
+          border: Border.all(color: AppColors.borderSoft),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.brandGreen.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.location_on,
+                  color: AppColors.brandGreen, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Delivering to',
+                    style: TextStyle(
+                      color: AppColors.inkMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    address.trim(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${latitude!.toStringAsFixed(5)}, ${longitude!.toStringAsFixed(5)}',
+                    style: const TextStyle(
+                      color: AppColors.inkFaint,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: onPickOnMap,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Change',
+                style: TextStyle(
+                  color: AppColors.brandBlue,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.brMd,
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Where should we deliver?',
+            style: TextStyle(
+              color: AppColors.ink,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Pick your exact spot so the rider reaches you quickly.',
+            style: TextStyle(
+              color: AppColors.inkMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: onUseCurrent,
+              icon: const Icon(Icons.my_location, size: 18),
+              label: const Text(
+                'Use my current location',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.brandBlue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.brMd,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: onPickOnMap,
+              icon: const Icon(Icons.map_outlined, size: 18),
+              label: const Text(
+                'Pick a different location on the map',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.brandBlue,
+                side: BorderSide(color: AppColors.borderSoft),
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.brMd,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CouponEntryCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _CouponEntryCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<CartProvider>(
+      builder: (_, cart, __) {
+        final applied = cart.appliedCoupon;
+        return Material(
+          color: AppColors.surface,
+          borderRadius: AppRadius.brMd,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: AppRadius.brMd,
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                borderRadius: AppRadius.brMd,
+                border: Border.all(
+                  color: applied != null
+                      ? AppColors.brandGreen.withValues(alpha: 0.35)
+                      : AppColors.borderSoft,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: (applied != null
+                              ? AppColors.brandGreen
+                              : AppColors.brandBlue)
+                          .withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.local_offer_outlined,
+                      color: applied != null
+                          ? AppColors.brandGreen
+                          : AppColors.brandBlue,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          applied != null
+                              ? 'Coupon ${applied.code} applied'
+                              : 'Apply a coupon',
+                          style: TextStyle(
+                            color: applied != null
+                                ? AppColors.brandGreenDark
+                                : AppColors.ink,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          applied != null
+                              ? '− ₹${(applied.discountCents / 100).toStringAsFixed(0)} off · Tap to change'
+                              : 'Save more on this order',
+                          style: const TextStyle(
+                            color: AppColors.inkMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right,
+                      color: AppColors.brandBlue, size: 20),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
