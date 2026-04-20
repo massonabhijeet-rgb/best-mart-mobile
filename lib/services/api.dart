@@ -232,4 +232,16 @@ class ApiService {
     return Order.fromJson(data['order']);
   }
 
+  // Payments (Razorpay)
+  static Future<Map<String, dynamic>> getPaymentConfig() async {
+    final data = await _req('GET', '/payments/config');
+    return Map<String, dynamic>.from(data);
+  }
+
+  static Future<Map<String, dynamic>> createPaymentIntent(int amountCents) async {
+    final data = await _req('POST', '/payments/create-order',
+        body: {'amountCents': amountCents}, auth: true);
+    return Map<String, dynamic>.from(data);
+  }
+
 }

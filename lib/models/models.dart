@@ -78,6 +78,10 @@ class Order {
   final double? deliveryLatitude;
   final double? deliveryLongitude;
   final String? cancellationReason;
+  final String? deliveryOtp;
+  final String? razorpayOrderId;
+  final String? razorpayPaymentId;
+  final String paymentStatus;
   final String createdDate;
   final String updatedDate;
   final List<OrderItem> items;
@@ -102,6 +106,10 @@ class Order {
     this.deliveryLatitude,
     this.deliveryLongitude,
     this.cancellationReason,
+    this.deliveryOtp,
+    this.razorpayOrderId,
+    this.razorpayPaymentId,
+    this.paymentStatus = 'pending',
     required this.createdDate,
     required this.updatedDate,
     required this.items,
@@ -127,6 +135,10 @@ class Order {
         deliveryLatitude: (j['deliveryLatitude'] as num?)?.toDouble(),
         deliveryLongitude: (j['deliveryLongitude'] as num?)?.toDouble(),
         cancellationReason: j['cancellationReason'] as String?,
+        deliveryOtp: j['deliveryOtp'] as String?,
+        razorpayOrderId: j['razorpayOrderId'] as String?,
+        razorpayPaymentId: j['razorpayPaymentId'] as String?,
+        paymentStatus: (j['paymentStatus'] as String?) ?? 'pending',
         createdDate: j['createdDate'],
         updatedDate: j['updatedDate'],
         items: (j['items'] as List).map((i) => OrderItem.fromJson(i)).toList(),
@@ -152,6 +164,10 @@ class Order {
         deliveryLatitude: deliveryLatitude,
         deliveryLongitude: deliveryLongitude,
         cancellationReason: cancellationReason,
+        deliveryOtp: deliveryOtp,
+        razorpayOrderId: razorpayOrderId,
+        razorpayPaymentId: razorpayPaymentId,
+        paymentStatus: paymentStatus,
         createdDate: createdDate,
         updatedDate: updatedDate,
         items: items,

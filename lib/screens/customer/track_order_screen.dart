@@ -292,6 +292,54 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                 ),
               ),
 
+              if (_order!.status == 'out_for_delivery' &&
+                  (_order!.deliveryOtp ?? '').isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  color: const Color(0xFF065F46),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'DELIVERY OTP',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            letterSpacing: 1.6,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _order!.deliveryOtp!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 38,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 10,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Share this with your rider to complete delivery.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
               if (_order!.status == 'cancelled' &&
                   (_order!.cancellationReason ?? '').trim().isNotEmpty) ...[
                 const SizedBox(height: 12),

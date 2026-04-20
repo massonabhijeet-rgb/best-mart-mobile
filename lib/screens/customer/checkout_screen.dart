@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../../models/models.dart';
 import '../../providers/home_provider.dart';
@@ -51,8 +54,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'icon': Icons.payments_outlined,
     },
     {
+      'value': 'razorpay',
+      'label': 'Pay Online',
+      'sub': 'UPI, Card, Netbanking — Razorpay',
+      'icon': Icons.lock_outline,
+    },
+    {
       'value': 'upi',
-      'label': 'UPI',
+      'label': 'UPI on Delivery',
       'sub': 'Google Pay, PhonePe, Paytm',
       'icon': Icons.qr_code_2,
     },
@@ -136,6 +145,49 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  Future<Map<String, String>> _runRazorpay({
+    required int amountCents,
+  }) async {
+    final intent = await ApiService.createPaymentIntent(amountCents);
+    final razorpay = Razorpay();
+    final completer = Completer<Map<String, String>>();
+    razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS,
+        (PaymentSuccessResponse r) {
+      if (completer.isCompleted) return;
+      completer.complete({
+        'razorpayOrderId': r.orderId ?? '',
+        'razorpayPaymentId': r.paymentId ?? '',
+        'razorpaySignature': r.signature ?? '',
+      });
+    });
+    razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, (PaymentFailureResponse r) {
+      if (completer.isCompleted) return;
+      completer.completeError(Exception(r.message ?? 'Payment failed'));
+    });
+    razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, (ExternalWalletResponse _w) {
+      // external wallet chosen; Razorpay will still emit success/error later.
+    });
+    razorpay.open({
+      'key': intent['keyId'],
+      'order_id': intent['razorpayOrderId'],
+      'amount': intent['amount'],
+      'currency': intent['currency'] ?? 'INR',
+      'name': 'BestMart',
+      'description': 'Order payment',
+      'prefill': {
+        'name': _nameCtrl.text.trim(),
+        'contact': _phoneCtrl.text.trim(),
+        'email': _emailCtrl.text.trim(),
+      },
+      'theme': {'color': '#10b981'},
+    });
+    try {
+      return await completer.future;
+    } finally {
+      razorpay.clear();
+    }
+  }
+
   Future<void> _placeOrder() async {
     if (_nameCtrl.text.trim().isEmpty ||
         _phoneCtrl.text.trim().isEmpty ||
@@ -153,6 +205,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _error = '';
     });
     try {
+      Map<String, String>? rzp;
+      if (_payment == 'razorpay') {
+        rzp = await _runRazorpay(amountCents: cart.grandTotalCents);
+      }
       final order = await ApiService.createOrder({
         'customerName': _nameCtrl.text.trim(),
         'customerPhone': _phoneCtrl.text.trim(),
@@ -166,6 +222,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'deliveryLatitude': _lat,
         'deliveryLongitude': _lng,
         'couponCode': cart.appliedCoupon?.code,
+        'razorpayOrderId': rzp?['razorpayOrderId'],
+        'razorpayPaymentId': rzp?['razorpayPaymentId'],
+        'razorpaySignature': rzp?['razorpaySignature'],
         'items': cart.items.values
             .map((i) =>
                 {'productId': i.product.uniqueId, 'quantity': i.quantity})
