@@ -170,12 +170,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  static String _upiAppLabel(String app) {
+    if (app == 'phonepe') return 'PhonePe';
+    if (app == 'google_pay') return 'Google Pay';
+    return 'Paytm';
+  }
+
   // Standard Checkout (cards / netbanking / other UPI). Returns the three
   // razorpay_* fields the server needs to verify a successful payment.
+  // If [reuseIntent] is passed, we skip creating a new Razorpay order and
+  // reuse an existing one — used by the UPI-intent → widget fallback path.
+  // If [preferredUpiApp] is set, the widget is configured to show ONLY that
+  // UPI app (not a full menu), so the customer still sees one tap.
   Future<Map<String, String>> _runRazorpay({
     required int amountCents,
+    Map<String, dynamic>? reuseIntent,
+    String? preferredUpiApp,
   }) async {
-    final intent = await ApiService.createPaymentIntent(amountCents);
+    final intent =
+        reuseIntent ?? await ApiService.createPaymentIntent(amountCents);
     final razorpay = Razorpay();
     final completer = Completer<Map<String, String>>();
     razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS,
@@ -208,6 +221,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       },
       'theme': {'color': '#10b981'},
     };
+    if (preferredUpiApp != null) {
+      options['method'] = {
+        'upi': true,
+        'card': false,
+        'netbanking': false,
+        'wallet': false,
+        'emi': false,
+        'paylater': false,
+      };
+      options['config'] = {
+        'display': {
+          'blocks': {
+            'upi_preferred': {
+              'name': 'Pay via ${_upiAppLabel(preferredUpiApp)}',
+              'instruments': [
+                {'method': 'upi', 'flows': ['intent'], 'apps': [preferredUpiApp]},
+              ],
+            },
+          },
+          'sequence': ['block.upi_preferred'],
+          'preferences': {'show_default_blocks': false},
+        },
+      };
+    }
     razorpay.open(options);
     try {
       return await completer.future;
@@ -233,10 +270,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _error = '';
     });
     try {
-      // phonepe / gpay / paytm → Razorpay S2S UPI Intent API: mint a URL
-      // that launches the specific UPI app with the amount pre-filled. The
-      // webhook flips the order to paid once Razorpay confirms capture.
-      // razorpay → Standard Checkout (cards, netbanking, other UPI apps).
+      // phonepe / gpay / paytm: try Razorpay S2S UPI Intent API first
+      // (direct app launch). If Razorpay rejects (e.g. S2S not enabled),
+      // fall back to Standard Checkout with that UPI app pre-selected.
+      // razorpay → Standard Checkout for cards / netbanking / other UPI.
+      //
+      // The BestMart order is only committed AFTER payment succeeds (or an
+      // intent URL is ready) so a failed payment never leaves a stale
+      // unpaid order behind.
       final preferredUpiApp = _upiAppMap[_payment];
       final isIntent = preferredUpiApp != null;
       final isWidget = _payment == 'razorpay';
@@ -244,13 +285,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final wirePaymentMethod = isOnline ? 'razorpay' : _payment;
 
       Map<String, String>? rzp;
+      String? intentLaunchUrl;
       String? pendingRazorpayOrderId;
       if (isWidget) {
         rzp = await _runRazorpay(amountCents: cart.grandTotalCents);
       } else if (isIntent) {
         final intent =
             await ApiService.createPaymentIntent(cart.grandTotalCents);
-        pendingRazorpayOrderId = intent['razorpayOrderId'] as String?;
+        final rzpOrderId = intent['razorpayOrderId'] as String?;
+        final rzpAmount = (intent['amount'] as num?)?.toInt() ??
+            cart.grandTotalCents;
+        try {
+          final launch = await ApiService.createUpiIntent(
+            razorpayOrderId: rzpOrderId ?? '',
+            amountCents: rzpAmount,
+            upiApp: preferredUpiApp,
+            contact: _phoneCtrl.text.trim(),
+          );
+          intentLaunchUrl = launch['intentUrl'] as String?;
+          pendingRazorpayOrderId = rzpOrderId;
+        } catch (_) {
+          // S2S UPI unavailable — fall back to Standard Checkout with this
+          // UPI app pre-selected. Reuse the SAME Razorpay order so we don't
+          // double-charge on retry.
+          rzp = await _runRazorpay(
+            amountCents: cart.grandTotalCents,
+            reuseIntent: intent,
+            preferredUpiApp: preferredUpiApp,
+          );
+        }
       }
 
       final order = await ApiService.createOrder({
@@ -275,24 +338,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             .toList(),
       });
 
-      if (isIntent) {
-        try {
-          final launch = await ApiService.createUpiIntent(
-            publicOrderId: order.publicId,
-            upiApp: preferredUpiApp,
-          );
-          final url = launch['intentUrl'] as String?;
-          if (url != null && url.isNotEmpty) {
-            await launchUrl(
-              Uri.parse(url),
-              mode: LaunchMode.externalApplication,
-            );
-          }
-        } catch (e) {
-          // Non-fatal — the order is already placed. User can retry from the
-          // track page.
-          if (mounted) setState(() => _error = e.toString());
-        }
+      if (intentLaunchUrl != null && intentLaunchUrl.isNotEmpty) {
+        await launchUrl(
+          Uri.parse(intentLaunchUrl),
+          mode: LaunchMode.externalApplication,
+        );
       }
 
       cart.clear();

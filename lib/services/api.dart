@@ -248,11 +248,24 @@ class ApiService {
   // GPay / Paytm directly with the amount pre-filled. Returns
   // {intentUrl, paymentId}.
   static Future<Map<String, dynamic>> createUpiIntent({
-    required String publicOrderId,
+    required String razorpayOrderId,
+    required int amountCents,
     required String upiApp,
+    String? contact,
+    String? email,
   }) async {
-    final data = await _req('POST', '/payments/upi-intent',
-        body: {'publicOrderId': publicOrderId, 'upiApp': upiApp}, auth: true);
+    final data = await _req(
+      'POST',
+      '/payments/upi-intent',
+      body: {
+        'razorpayOrderId': razorpayOrderId,
+        'amountCents': amountCents,
+        'upiApp': upiApp,
+        if (contact != null && contact.isNotEmpty) 'contact': contact,
+        if (email != null && email.isNotEmpty) 'email': email,
+      },
+      auth: true,
+    );
     return Map<String, dynamic>.from(data);
   }
 
