@@ -101,17 +101,14 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
         barrierColor: Colors.black.withValues(alpha: 0.72),
         builder: (dialogCtx) => _CampaignOverlay(
           campaign: c,
-          onTap: () {
+          onCategoryTap: (categoryId) {
             Navigator.of(dialogCtx).pop();
-            final cid = c.categoryId;
-            if (cid != null) {
-              context.read<HomeProvider>().setCategory(cid);
-              _scrollCtrl.animateTo(
-                0,
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeOut,
-              );
-            }
+            context.read<HomeProvider>().setCategory(categoryId);
+            _scrollCtrl.animateTo(
+              0,
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOut,
+            );
           },
           onClose: () => Navigator.of(dialogCtx).pop(),
         ),
@@ -1326,12 +1323,12 @@ class _EmptyView extends StatelessWidget {
 class _CampaignOverlay extends StatelessWidget {
   const _CampaignOverlay({
     required this.campaign,
-    required this.onTap,
+    required this.onCategoryTap,
     required this.onClose,
   });
 
   final Campaign campaign;
-  final VoidCallback onTap;
+  final void Function(int categoryId) onCategoryTap;
   final VoidCallback onClose;
 
   @override
@@ -1345,26 +1342,66 @@ class _CampaignOverlay extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(18),
-            child: GestureDetector(
-              onTap: onTap,
-              child: Image.network(
-                campaign.imageUrl!,
-                fit: BoxFit.contain,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return Container(
-                    color: Colors.black,
-                    width: 300,
-                    height: 380,
-                    alignment: Alignment.center,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white70),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: onClose,
+                    child: Image.network(
+                      campaign.imageUrl!,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          color: Colors.black,
+                          width: 300,
+                          height: 380,
+                          alignment: Alignment.center,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white70),
+                          ),
+                        );
+                      },
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
-                  );
-                },
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                  if (campaign.categories.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          for (final cat in campaign.categories)
+                            InkWell(
+                              borderRadius: BorderRadius.circular(999),
+                              onTap: () => onCategoryTap(cat.id),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.brandBlue,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  cat.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
           ),

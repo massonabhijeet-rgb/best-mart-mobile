@@ -292,6 +292,53 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                 ),
               ),
 
+              if (_order!.status == 'cancelled' &&
+                  (_order!.cancellationReason ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Card(
+                  color: const Color(0xFFFDECEA),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: Color(0xFFF5C2B8)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline,
+                            color: AppColors.danger, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Reason for cancellation',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.danger,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _order!.cancellationReason!,
+                                style: const TextStyle(
+                                  color: AppColors.ink,
+                                  fontSize: 13,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
               // Timeline
               const SizedBox(height: 12),
               Card(

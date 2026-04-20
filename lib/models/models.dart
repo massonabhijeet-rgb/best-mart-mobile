@@ -77,6 +77,7 @@ class Order {
   final String? assignedRiderPhone;
   final double? deliveryLatitude;
   final double? deliveryLongitude;
+  final String? cancellationReason;
   final String createdDate;
   final String updatedDate;
   final List<OrderItem> items;
@@ -100,6 +101,7 @@ class Order {
     this.assignedRiderPhone,
     this.deliveryLatitude,
     this.deliveryLongitude,
+    this.cancellationReason,
     required this.createdDate,
     required this.updatedDate,
     required this.items,
@@ -124,6 +126,7 @@ class Order {
         assignedRiderPhone: j['assignedRiderPhone'],
         deliveryLatitude: (j['deliveryLatitude'] as num?)?.toDouble(),
         deliveryLongitude: (j['deliveryLongitude'] as num?)?.toDouble(),
+        cancellationReason: j['cancellationReason'] as String?,
         createdDate: j['createdDate'],
         updatedDate: j['updatedDate'],
         items: (j['items'] as List).map((i) => OrderItem.fromJson(i)).toList(),
@@ -148,6 +151,7 @@ class Order {
         assignedRiderPhone: assignedRiderPhone,
         deliveryLatitude: deliveryLatitude,
         deliveryLongitude: deliveryLongitude,
+        cancellationReason: cancellationReason,
         createdDate: createdDate,
         updatedDate: updatedDate,
         items: items,
@@ -223,22 +227,34 @@ class Category {
       );
 }
 
+class CampaignCategoryRef {
+  final int id;
+  final String slug;
+  final String name;
+
+  CampaignCategoryRef({required this.id, required this.slug, required this.name});
+
+  factory CampaignCategoryRef.fromJson(Map<String, dynamic> j) => CampaignCategoryRef(
+        id: j['id'] as int,
+        slug: (j['slug'] ?? '').toString(),
+        name: (j['name'] ?? '').toString(),
+      );
+}
+
 class Campaign {
   final int id;
   final String title;
   final String? imageUrl;
-  final int? categoryId;
-  final String? categorySlug;
-  final String? categoryName;
+  final List<int> categoryIds;
+  final List<CampaignCategoryRef> categories;
   final bool isActive;
 
   Campaign({
     required this.id,
     required this.title,
     this.imageUrl,
-    this.categoryId,
-    this.categorySlug,
-    this.categoryName,
+    this.categoryIds = const [],
+    this.categories = const [],
     required this.isActive,
   });
 
@@ -246,9 +262,14 @@ class Campaign {
         id: j['id'],
         title: (j['title'] ?? '').toString(),
         imageUrl: j['imageUrl'],
-        categoryId: j['categoryId'],
-        categorySlug: j['categorySlug'],
-        categoryName: j['categoryName'],
+        categoryIds: (j['categoryIds'] as List?)
+                ?.map((v) => (v as num).toInt())
+                .toList() ??
+            const [],
+        categories: (j['categories'] as List?)
+                ?.map((v) => CampaignCategoryRef.fromJson(v as Map<String, dynamic>))
+                .toList() ??
+            const [],
         isActive: j['isActive'] ?? false,
       );
 }
