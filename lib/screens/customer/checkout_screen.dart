@@ -1026,17 +1026,26 @@ class _PaymentSummaryCard extends StatelessWidget {
                 height: 36,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: AppColors.brandBlue.withValues(alpha: 0.1),
+                  color: iconUrl != null
+                      ? AppColors.surface
+                      : AppColors.brandBlue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
+                  border: iconUrl != null
+                      ? Border.all(color: AppColors.borderSoft)
+                      : null,
                 ),
                 child: iconUrl != null
-                    ? Image.network(
-                        iconUrl!,
-                        width: 30,
-                        height: 30,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Icon(icon,
-                            color: AppColors.brandBlue, size: 20),
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Image.network(
+                            iconUrl!,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Icon(icon,
+                                color: AppColors.brandBlue, size: 20),
+                          ),
+                        ),
                       )
                     : Icon(icon, color: AppColors.brandBlue, size: 20),
               ),
@@ -1130,25 +1139,29 @@ class _PaymentTile extends StatelessWidget {
                   height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: selected
-                        ? AppColors.brandBlue
-                        : AppColors.brandBlue.withValues(alpha: 0.1),
+                    color: iconUrl != null
+                        ? AppColors.surface
+                        : (selected
+                            ? AppColors.brandBlue
+                            : AppColors.brandBlue.withValues(alpha: 0.1)),
                     borderRadius: AppRadius.brSm,
+                    border: iconUrl != null
+                        ? Border.all(color: AppColors.borderSoft)
+                        : null,
                   ),
                   child: iconUrl != null
                       ? ClipRRect(
                           borderRadius: AppRadius.brSm,
-                          child: Image.network(
-                            iconUrl!,
-                            width: 30,
-                            height: 30,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => Icon(
-                              icon,
-                              color: selected
-                                  ? Colors.white
-                                  : AppColors.brandBlue,
-                              size: 20,
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Image.network(
+                              iconUrl!,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Icon(
+                                icon,
+                                color: AppColors.brandBlue,
+                                size: 20,
+                              ),
                             ),
                           ),
                         )
