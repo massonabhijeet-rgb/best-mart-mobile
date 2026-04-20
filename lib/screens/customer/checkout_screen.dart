@@ -54,24 +54,54 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'icon': Icons.payments_outlined,
     },
     {
+      'value': 'phonepe',
+      'label': 'PhonePe',
+      'sub': 'Opens PhonePe directly via UPI',
+      'icon': Icons.account_balance_wallet_outlined,
+    },
+    {
+      'value': 'gpay',
+      'label': 'Google Pay',
+      'sub': 'Opens GPay directly via UPI',
+      'icon': Icons.account_balance_wallet_outlined,
+    },
+    {
+      'value': 'paytm',
+      'label': 'Paytm',
+      'sub': 'Opens Paytm directly via UPI',
+      'icon': Icons.account_balance_wallet_outlined,
+    },
+    {
       'value': 'razorpay',
-      'label': 'Pay Online',
-      'sub': 'UPI, Card, Netbanking — Razorpay',
+      'label': 'Card / Netbanking / Other UPI',
+      'sub': 'Pay online via Razorpay',
       'icon': Icons.lock_outline,
     },
     {
       'value': 'upi',
       'label': 'UPI on Delivery',
-      'sub': 'Google Pay, PhonePe, Paytm',
+      'sub': 'Pay the rider via UPI QR',
       'icon': Icons.qr_code_2,
     },
     {
       'value': 'card',
-      'label': 'Credit / Debit Card',
+      'label': 'Credit / Debit Card on Delivery',
       'sub': 'Visa, Mastercard, RuPay',
       'icon': Icons.credit_card,
     },
   ];
+
+  static const Map<String, String> _upiAppMap = {
+    'phonepe': 'phonepe',
+    'gpay': 'google_pay',
+    'paytm': 'paytm',
+  };
+
+  static String _upiAppLabel(String app) {
+    if (app == 'phonepe') return 'PhonePe';
+    if (app == 'google_pay') return 'Google Pay';
+    return 'Paytm';
+  }
 
   @override
   void initState() {
@@ -147,6 +177,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<Map<String, String>> _runRazorpay({
     required int amountCents,
+    String? preferredUpiApp,
   }) async {
     final intent = await ApiService.createPaymentIntent(amountCents);
     final razorpay = Razorpay();
@@ -167,7 +198,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, (ExternalWalletResponse _w) {
       // external wallet chosen; Razorpay will still emit success/error later.
     });
-    razorpay.open({
+    final Map<String, dynamic> options = {
       'key': intent['keyId'],
       'order_id': intent['razorpayOrderId'],
       'amount': intent['amount'],
@@ -180,7 +211,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'email': _emailCtrl.text.trim(),
       },
       'theme': {'color': '#10b981'},
-    });
+    };
+    if (preferredUpiApp != null) {
+      options['method'] = {
+        'upi': true,
+        'card': false,
+        'netbanking': false,
+        'wallet': false,
+        'emi': false,
+        'paylater': false,
+      };
+      options['config'] = {
+        'display': {
+          'blocks': {
+            'upi_preferred': {
+              'name': 'Pay via ${_upiAppLabel(preferredUpiApp)}',
+              'instruments': [
+                {'method': 'upi', 'flows': ['intent'], 'apps': [preferredUpiApp]},
+              ],
+            },
+          },
+          'sequence': ['block.upi_preferred'],
+          'preferences': {'show_default_blocks': false},
+        },
+      };
+    }
+    razorpay.open(options);
     try {
       return await completer.future;
     } finally {
@@ -205,9 +261,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _error = '';
     });
     try {
+      // phonepe/gpay/paytm are UI-only selections. They map to the same
+      // wire-level 'razorpay' payment method + a preferred UPI app that
+      // Razorpay's widget uses to launch only that app via intent flow.
+      final preferredUpiApp = _upiAppMap[_payment];
+      final isOnline = _payment == 'razorpay' || preferredUpiApp != null;
+      final wirePaymentMethod = isOnline ? 'razorpay' : _payment;
+
       Map<String, String>? rzp;
-      if (_payment == 'razorpay') {
-        rzp = await _runRazorpay(amountCents: cart.grandTotalCents);
+      if (isOnline) {
+        rzp = await _runRazorpay(
+          amountCents: cart.grandTotalCents,
+          preferredUpiApp: preferredUpiApp,
+        );
       }
       final order = await ApiService.createOrder({
         'customerName': _nameCtrl.text.trim(),
@@ -218,7 +284,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'deliveryNotes':
             _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
         'deliverySlot': _slot,
-        'paymentMethod': _payment,
+        'paymentMethod': wirePaymentMethod,
         'deliveryLatitude': _lat,
         'deliveryLongitude': _lng,
         'couponCode': cart.appliedCoupon?.code,
