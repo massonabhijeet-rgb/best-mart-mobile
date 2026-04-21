@@ -90,6 +90,12 @@ class Order {
   final String? razorpayOrderId;
   final String? razorpayPaymentId;
   final String paymentStatus;
+  // Cached driving route from rider's last "significant move" to the delivery
+  // address. Server fetches this from Google once per ~500m of rider drift, so
+  // customer tracking never calls the Directions API itself.
+  final String? routePolyline;
+  final int? routeDurationSec;
+  final int? routeDistanceM;
   final String createdDate;
   final String updatedDate;
   final List<OrderItem> items;
@@ -118,6 +124,9 @@ class Order {
     this.razorpayOrderId,
     this.razorpayPaymentId,
     this.paymentStatus = 'pending',
+    this.routePolyline,
+    this.routeDurationSec,
+    this.routeDistanceM,
     required this.createdDate,
     required this.updatedDate,
     required this.items,
@@ -147,6 +156,9 @@ class Order {
         razorpayOrderId: j['razorpayOrderId'] as String?,
         razorpayPaymentId: j['razorpayPaymentId'] as String?,
         paymentStatus: (j['paymentStatus'] as String?) ?? 'pending',
+        routePolyline: j['routePolyline'] as String?,
+        routeDurationSec: (j['routeDurationSec'] as num?)?.toInt(),
+        routeDistanceM: (j['routeDistanceM'] as num?)?.toInt(),
         createdDate: j['createdDate'],
         updatedDate: j['updatedDate'],
         items: (j['items'] as List).map((i) => OrderItem.fromJson(i)).toList(),
@@ -176,6 +188,9 @@ class Order {
         razorpayOrderId: razorpayOrderId,
         razorpayPaymentId: razorpayPaymentId,
         paymentStatus: paymentStatus,
+        routePolyline: routePolyline,
+        routeDurationSec: routeDurationSec,
+        routeDistanceM: routeDistanceM,
         createdDate: createdDate,
         updatedDate: updatedDate,
         items: items,

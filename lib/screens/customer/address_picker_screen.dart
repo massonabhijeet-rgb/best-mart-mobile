@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../models/models.dart';
+import '../../services/google_maps_service.dart';
 import '../../theme/tokens.dart';
 
 /// Result returned from [AddressPickerScreen.open]. The picker collects both
@@ -102,10 +104,13 @@ class AddressPickerScreen extends StatefulWidget {
 class _AddressPickerScreenState extends State<AddressPickerScreen> {
   static const LatLng _fallbackCenter = LatLng(28.6139, 77.2090); // Delhi
 
-  final _mapCtrl = MapController();
+  final Completer<GoogleMapController> _mapCtrl = Completer();
   late LatLng _pinned;
   bool _locating = false;
   String? _locationError;
+  // Debounces reverse-geocoding: we only fire once the camera stops moving.
+  Timer? _geocodeDebounce;
+  bool _reverseLoading = false;
 
   // When saved addresses exist we default to the list view (matches the
   // Zepto-style picker) and only flip to the map when the user explicitly
@@ -150,6 +155,12 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
       // populate distance badges if/when it resolves.
       _resolveCurrentPosition();
     }
+  }
+
+  @override
+  void dispose() {
+    _geocodeDebounce?.cancel();
+    super.dispose();
   }
 
   Future<void> _resolveCurrentPosition() async {
@@ -201,9 +212,10 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
       _draftNotes = a.deliveryNotes ?? '';
       _editingSavedAddressId = a.id;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (a.latitude != null && a.longitude != null) {
-        _mapCtrl.move(target, 17);
+        final c = await _mapCtrl.future;
+        c.animateCamera(CameraUpdate.newLatLngZoom(target, 17));
       }
     });
   }
@@ -236,7 +248,9 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
         _pinned = target;
         _locating = false;
       });
-      _mapCtrl.move(target, 17);
+      final c = await _mapCtrl.future;
+      await c.animateCamera(CameraUpdate.newLatLngZoom(target, 17));
+      _scheduleReverseGeocode(target);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -244,6 +258,23 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
         _locationError = 'Could not fetch your location. Please try again.';
       });
     }
+  }
+
+  void _scheduleReverseGeocode(LatLng target) {
+    _geocodeDebounce?.cancel();
+    _geocodeDebounce = Timer(const Duration(milliseconds: 600), () async {
+      if (!mounted) return;
+      setState(() => _reverseLoading = true);
+      final address =
+          await GoogleMapsService.reverseGeocode(target.latitude, target.longitude);
+      if (!mounted) return;
+      setState(() {
+        _reverseLoading = false;
+        if (address != null && address.isNotEmpty) {
+          _draftAddressLine = address;
+        }
+      });
+    });
   }
 
   Future<void> _continueToDetails() async {
@@ -392,28 +423,31 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
               height: mapHeight,
               child: Stack(
                 children: [
-                  FlutterMap(
-                    mapController: _mapCtrl,
-                    options: MapOptions(
-                      initialCenter: _pinned,
-                      initialZoom: 16,
-                      minZoom: 4,
-                      maxZoom: 19,
-                      onPositionChanged: (pos, _) {
-                        final c = pos.center;
-                        if (c.latitude != _pinned.latitude ||
-                            c.longitude != _pinned.longitude) {
-                          setState(() => _pinned = c);
-                        }
-                      },
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: _pinned,
+                      zoom: 16,
                     ),
-                    children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.bestmart.mobile',
+                    onMapCreated: (c) {
+                      if (!_mapCtrl.isCompleted) _mapCtrl.complete(c);
+                    },
+                    onCameraMove: (pos) {
+                      if (pos.target.latitude != _pinned.latitude ||
+                          pos.target.longitude != _pinned.longitude) {
+                        setState(() => _pinned = pos.target);
+                      }
+                    },
+                    onCameraIdle: () => _scheduleReverseGeocode(_pinned),
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: false,
+                    mapToolbarEnabled: false,
+                    compassEnabled: false,
+                    gestureRecognizers: {
+                      Factory<OneSequenceGestureRecognizer>(
+                        () => EagerGestureRecognizer(),
                       ),
-                    ],
+                    },
                   ),
                   // Center pin — overlay, not a Marker, so it stays fixed at
                   // the viewport centre while the user pans the map.
@@ -500,20 +534,45 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(Icons.location_on,
                           color: AppColors.brandBlue, size: 18),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(
-                          '${_pinned.latitude.toStringAsFixed(5)}, ${_pinned.longitude.toStringAsFixed(5)}',
-                          style: const TextStyle(
-                            color: AppColors.inkMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_draftAddressLine.trim().isNotEmpty)
+                              Text(
+                                _draftAddressLine,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.ink,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.3,
+                                ),
+                              ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${_pinned.latitude.toStringAsFixed(5)}, ${_pinned.longitude.toStringAsFixed(5)}',
+                              style: const TextStyle(
+                                color: AppColors.inkMuted,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      if (_reverseLoading)
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                     ],
                   ),
                   if (_locationError != null) ...[

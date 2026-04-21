@@ -1,11 +1,13 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../models/models.dart';
 import '../../services/api.dart';
+import '../../services/google_maps_service.dart';
 import '../../services/socket_service.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/order_status_badge.dart';
@@ -27,6 +29,17 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   StreamSubscription? _orderSub, _locationSub;
   bool _deliveredBanner = false;
 
+  // Route display: we prefer the server-cached polyline attached to the order
+  // (which the backend refreshes every ~500m of rider drift, costing us ~1
+  // Directions call per order). If for some reason the order doesn't have a
+  // cached route yet, we fall back to calling Directions directly — at most
+  // once per order — just so the UI isn't empty.
+  final Completer<GoogleMapController> _mapCtrl = Completer();
+  List<LatLng> _routePoints = [];
+  String? _directionsFallbackOrderId;
+  int? _routeEtaSeconds;
+  String? _decodedPolylineCache;
+
   static const _timeline = ['placed', 'confirmed', 'packing', 'out_for_delivery', 'delivered'];
 
   @override
@@ -44,13 +57,58 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         if (wasNotDelivered && updated.status == 'delivered') {
           setState(() => _deliveredBanner = true);
         }
+        _maybeFetchRoute();
       }
     });
 
     _locationSub = SocketService.instance.onRiderLocation.listen((loc) {
       if (_order?.assignedRiderUserId == loc.riderId) {
         setState(() => _riderLocation = loc);
+        _maybeFetchRoute();
       }
+    });
+  }
+
+  Future<void> _maybeFetchRoute() async {
+    final order = _order;
+    if (order == null) return;
+    if (order.deliveryLatitude == null || order.deliveryLongitude == null) return;
+
+    // Prefer the server-cached polyline. The backend refreshes it on rider GPS
+    // pings, so subsequent `_order` updates from polling / websocket will keep
+    // this fresh without any Directions API call from the client.
+    final cached = order.routePolyline;
+    if (cached != null && cached.isNotEmpty) {
+      if (cached != _decodedPolylineCache) {
+        final points = GoogleMapsService.decodePolyline(cached);
+        if (!mounted) return;
+        setState(() {
+          _routePoints = points;
+          _routeEtaSeconds = order.routeDurationSec;
+          _decodedPolylineCache = cached;
+        });
+      } else if (order.routeDurationSec != _routeEtaSeconds) {
+        setState(() => _routeEtaSeconds = order.routeDurationSec);
+      }
+      return;
+    }
+
+    // Fallback: server hasn't cached a route yet. Call Directions once per
+    // order so the UI isn't empty. We only set the dedup lock on success —
+    // otherwise a transient failure (e.g. API not enabled yet) would
+    // permanently block the fetch until the app is relaunched.
+    final rider = _riderLocation;
+    if (rider == null) return;
+    if (_directionsFallbackOrderId == order.publicId) return;
+    final result = await GoogleMapsService.fetchDirections(
+      LatLng(rider.latitude, rider.longitude),
+      LatLng(order.deliveryLatitude!, order.deliveryLongitude!),
+    );
+    if (!mounted || result == null) return;
+    _directionsFallbackOrderId = order.publicId;
+    setState(() {
+      _routePoints = result.points;
+      _routeEtaSeconds = result.durationSeconds;
     });
   }
 
@@ -70,6 +128,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         _order = order;
         if (order.status == 'delivered') _deliveredBanner = true;
       });
+      _maybeFetchRoute();
       _pollTimer?.cancel();
       _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
         try {
@@ -437,9 +496,17 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                           children: [
                             _PulsingDot(),
                             const SizedBox(width: 8),
-                            const Text('Rider is on the way',
-                                style: TextStyle(color: AppColors.brandBlueDark, fontWeight: FontWeight.w700, fontSize: 14)),
-                            const Spacer(),
+                            Expanded(
+                              child: Text(
+                                _routeEtaSeconds != null
+                                    ? 'Rider on the way — ETA ${(_routeEtaSeconds! / 60).ceil()} min'
+                                    : 'Rider is on the way',
+                                style: const TextStyle(
+                                    color: AppColors.brandBlueDark,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14),
+                              ),
+                            ),
                             Text(_ageLabel(_riderLocation!.updatedAt),
                                 style: const TextStyle(color: Colors.grey, fontSize: 12)),
                           ],
@@ -448,26 +515,55 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                       ClipRRect(
                         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
                         child: SizedBox(
-                          height: 200,
-                          child: FlutterMap(
-                            options: MapOptions(
-                              initialCenter: LatLng(_riderLocation!.latitude, _riderLocation!.longitude),
-                              initialZoom: 15,
+                          height: 220,
+                          child: GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: LatLng(_riderLocation!.latitude, _riderLocation!.longitude),
+                              zoom: 15,
                             ),
-                            children: [
-                              TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
-                              MarkerLayer(markers: [
+                            onMapCreated: (c) {
+                              if (!_mapCtrl.isCompleted) _mapCtrl.complete(c);
+                            },
+                            markers: {
+                              Marker(
+                                markerId: const MarkerId('rider'),
+                                position: LatLng(
+                                    _riderLocation!.latitude, _riderLocation!.longitude),
+                                icon: BitmapDescriptor.defaultMarkerWithHue(
+                                    BitmapDescriptor.hueOrange),
+                                infoWindow: const InfoWindow(title: 'Rider'),
+                              ),
+                              if (_order!.deliveryLatitude != null &&
+                                  _order!.deliveryLongitude != null)
                                 Marker(
-                                  point: LatLng(_riderLocation!.latitude, _riderLocation!.longitude),
-                                  child: const Icon(Icons.directions_bike, color: AppColors.brandOrange, size: 32),
+                                  markerId: const MarkerId('delivery'),
+                                  position: LatLng(_order!.deliveryLatitude!,
+                                      _order!.deliveryLongitude!),
+                                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                                      BitmapDescriptor.hueRed),
+                                  infoWindow:
+                                      const InfoWindow(title: 'Delivery'),
                                 ),
-                                if (_order!.deliveryLatitude != null)
-                                  Marker(
-                                    point: LatLng(_order!.deliveryLatitude!, _order!.deliveryLongitude!),
-                                    child: const Icon(Icons.location_pin, color: AppColors.danger, size: 32),
-                                  ),
-                              ]),
-                            ],
+                            },
+                            polylines: _routePoints.isEmpty
+                                ? {}
+                                : {
+                                    Polyline(
+                                      polylineId: const PolylineId('route'),
+                                      color: AppColors.brandBlue,
+                                      width: 4,
+                                      points: _routePoints,
+                                    ),
+                                  },
+                            myLocationButtonEnabled: false,
+                            zoomControlsEnabled: false,
+                            mapToolbarEnabled: false,
+                            liteModeEnabled: false,
+                            gestureRecognizers: {
+                              Factory<OneSequenceGestureRecognizer>(
+                                () => EagerGestureRecognizer(),
+                              ),
+                            },
                           ),
                         ),
                       ),
