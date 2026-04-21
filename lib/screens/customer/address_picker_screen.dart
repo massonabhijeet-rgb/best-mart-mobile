@@ -107,6 +107,24 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
   bool _locating = false;
   String? _locationError;
 
+  // When saved addresses exist we default to the list view (matches the
+  // Zepto-style picker) and only flip to the map when the user explicitly
+  // adds a new address. Without saved addresses the map is the only sensible
+  // starting point.
+  late String _mode; // 'list' | 'map'
+  Position? _currentPosition;
+
+  // Details-sheet initials are tracked separately from widget.initial* so
+  // the "+ Add new address" entry can start blank while "Edit" on a saved
+  // address starts prefilled with that address's data.
+  late String _draftAddressLine;
+  late String _draftFullName;
+  late String _draftPhone;
+  late String _draftNotes;
+  // When non-null the next successful save should update this saved address
+  // rather than create a new draft.
+  int? _editingSavedAddressId;
+
   @override
   void initState() {
     super.initState();
@@ -114,11 +132,80 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
       widget.initialLatitude ?? _fallbackCenter.latitude,
       widget.initialLongitude ?? _fallbackCenter.longitude,
     );
+    _draftAddressLine = widget.initialAddressLine;
+    _draftFullName = widget.initialFullName;
+    _draftPhone = widget.initialPhone;
+    _draftNotes = widget.initialNotes;
+    _mode = (widget.savedAddresses.isNotEmpty &&
+            !widget.fetchCurrentLocationOnOpen)
+        ? 'list'
+        : 'map';
     if (widget.fetchCurrentLocationOnOpen) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _fetchCurrentLocation();
       });
     }
+    if (_mode == 'list') {
+      // Best-effort — we don't block the UI on the permission dialog, we just
+      // populate distance badges if/when it resolves.
+      _resolveCurrentPosition();
+    }
+  }
+
+  Future<void> _resolveCurrentPosition() async {
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
+      if (!mounted) return;
+      setState(() => _currentPosition = pos);
+    } catch (_) {
+      // Swallow — distance badges are purely decorative.
+    }
+  }
+
+  void _switchToMap() {
+    // "+ Add new address" — blank details sheet, no saved-id carryover.
+    setState(() {
+      _mode = 'map';
+      _draftAddressLine = '';
+      _draftFullName = '';
+      _draftPhone = '';
+      _draftNotes = '';
+      _editingSavedAddressId = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchCurrentLocation();
+    });
+  }
+
+  void _switchToMapForEdit(SavedAddress a) {
+    final target = LatLng(
+      a.latitude ?? _pinned.latitude,
+      a.longitude ?? _pinned.longitude,
+    );
+    setState(() {
+      _mode = 'map';
+      _pinned = target;
+      _draftAddressLine = a.deliveryAddress;
+      _draftFullName = a.fullName;
+      _draftPhone = a.phone;
+      _draftNotes = a.deliveryNotes ?? '';
+      _editingSavedAddressId = a.id;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (a.latitude != null && a.longitude != null) {
+        _mapCtrl.move(target, 17);
+      }
+    });
   }
 
   Future<void> _fetchCurrentLocation() async {
@@ -170,10 +257,11 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
       builder: (sheetContext) => _AddressDetailsSheet(
         latitude: _pinned.latitude,
         longitude: _pinned.longitude,
-        initialAddressLine: widget.initialAddressLine,
-        initialFullName: widget.initialFullName,
-        initialPhone: widget.initialPhone,
-        initialNotes: widget.initialNotes,
+        initialAddressLine: _draftAddressLine,
+        initialFullName: _draftFullName,
+        initialPhone: _draftPhone,
+        initialNotes: _draftNotes,
+        savedAddressId: _editingSavedAddressId,
       ),
     );
     if (!mounted || picked == null) return;
@@ -196,17 +284,108 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    // Cap the map height so the saved-address list below always peeks — on
-    // very tall screens we don't want the map to swallow everything.
-    final mapHeight = screenHeight * 0.42;
-    final saved = widget.savedAddresses;
     return Scaffold(
       backgroundColor: AppColors.pageBg,
       appBar: AppBar(
-        title: const Text('Pin your delivery location'),
+        title: Text(
+          _mode == 'list'
+              ? 'Select delivery location'
+              : 'Pin your delivery location',
+        ),
+        leading: _mode == 'map' && widget.savedAddresses.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => setState(() => _mode = 'list'),
+              )
+            : null,
       ),
-      body: CustomScrollView(
+      body: _mode == 'list' ? _buildList() : _buildMap(),
+    );
+  }
+
+  Widget _buildList() {
+    final saved = widget.savedAddresses;
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
+            child: _AddNewAddressRow(onTap: _switchToMap),
+          ),
+        ),
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
+            child: Text(
+              'Your saved addresses',
+              style: TextStyle(
+                color: AppColors.inkMuted,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final a = saved[index];
+              final isCurrent = widget.selectedSavedAddressId == a.id;
+              final distanceKm = _distanceKmTo(a);
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  0,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
+                child: _SavedAddressTile(
+                  address: a,
+                  isCurrent: isCurrent,
+                  distanceKm: distanceKm,
+                  onTap: () => _pickSaved(a),
+                  onEdit: () => _switchToMapForEdit(a),
+                ),
+              );
+            },
+            childCount: saved.length,
+          ),
+        ),
+        const SliverToBoxAdapter(
+          child: SizedBox(height: AppSpacing.md),
+        ),
+      ],
+    );
+  }
+
+  double? _distanceKmTo(SavedAddress a) {
+    final pos = _currentPosition;
+    if (pos == null) return null;
+    if (a.latitude == null || a.longitude == null) return null;
+    final meters = Geolocator.distanceBetween(
+      pos.latitude,
+      pos.longitude,
+      a.latitude!,
+      a.longitude!,
+    );
+    return meters / 1000.0;
+  }
+
+  Widget _buildMap() {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final mapHeight = screenHeight * 0.55;
+    return CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
             child: SizedBox(
@@ -374,60 +553,70 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
               ),
             ),
           ),
-          if (saved.isNotEmpty) ...[
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.xs,
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.bookmark_border,
-                        size: 16, color: AppColors.inkMuted),
-                    SizedBox(width: 6),
-                    Text(
-                      'SAVED ADDRESSES',
-                      style: TextStyle(
-                        color: AppColors.inkMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final a = saved[index];
-                  final isCurrent = widget.selectedSavedAddressId == a.id;
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.md,
-                      0,
-                      AppSpacing.md,
-                      AppSpacing.sm,
-                    ),
-                    child: _SavedAddressTile(
-                      address: a,
-                      isCurrent: isCurrent,
-                      onTap: () => _pickSaved(a),
-                    ),
-                  );
-                },
-                childCount: saved.length,
-              ),
-            ),
-          ],
           const SliverToBoxAdapter(
             child: SizedBox(height: AppSpacing.md),
           ),
         ],
+      );
+  }
+}
+
+class _AddNewAddressRow extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AddNewAddressRow({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: AppRadius.brMd,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.brMd,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.md,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.brMd,
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.brandBlue.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.add,
+                  color: AppColors.brandBlue,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              const Expanded(
+                child: Text(
+                  'Add new address',
+                  style: TextStyle(
+                    color: AppColors.brandBlue,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.inkFaint,
+                size: 22,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -436,12 +625,22 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
 class _SavedAddressTile extends StatelessWidget {
   final SavedAddress address;
   final bool isCurrent;
+  final double? distanceKm;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
   const _SavedAddressTile({
     required this.address,
     required this.isCurrent,
+    required this.distanceKm,
     required this.onTap,
+    required this.onEdit,
   });
+
+  String _formatDistance(double km) {
+    if (km >= 100) return '${km.toStringAsFixed(0)} km';
+    if (km >= 10) return '${km.toStringAsFixed(1)} km';
+    return '${km.toStringAsFixed(2)} km';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -463,94 +662,142 @@ class _SavedAddressTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.brandBlue.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.location_on_outlined,
-                  color: AppColors.brandBlue,
-                  size: 20,
-                ),
-              ),
+              _IconTile(isCurrent: isCurrent, distanceKm: distanceKm,
+                  formatDistance: _formatDistance),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            address.fullName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.ink,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        if (isCurrent)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.brandBlue
-                                  .withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: const Text(
-                              'CURRENT',
-                              style: TextStyle(
-                                color: AppColors.brandBlueDark,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                      ],
+                    Text(
+                      address.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
                       address.deliveryAddress,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.inkMuted,
-                        fontSize: 12,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w500,
+                        height: 1.35,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      address.phone,
-                      style: const TextStyle(
-                        color: AppColors.inkFaint,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Phone number: ${address.phone}',
+                            style: const TextStyle(
+                              color: AppColors.inkFaint,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: onEdit,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(
+                                  Icons.edit_outlined,
+                                  color: AppColors.brandBlue,
+                                  size: 14,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Edit',
+                                  style: TextStyle(
+                                    color: AppColors.brandBlue,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.inkFaint,
-                size: 20,
-              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _IconTile extends StatelessWidget {
+  final bool isCurrent;
+  final double? distanceKm;
+  final String Function(double) formatDistance;
+  const _IconTile({
+    required this.isCurrent,
+    required this.distanceKm,
+    required this.formatDistance,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isCurrent
+        ? AppColors.brandBlue.withValues(alpha: 0.12)
+        : AppColors.brandOrange.withValues(alpha: 0.10);
+    final fg = isCurrent ? AppColors.brandBlue : AppColors.brandOrangeDark;
+    return Container(
+      width: 76,
+      height: 88,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            isCurrent ? Icons.home_rounded : Icons.location_on_rounded,
+            color: fg,
+            size: 34,
+          ),
+          const SizedBox(height: 6),
+          if (isCurrent)
+            const Text(
+              "You're here",
+              style: TextStyle(
+                color: AppColors.brandBlueDark,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            )
+          else if (distanceKm != null)
+            Text(
+              formatDistance(distanceKm!),
+              style: const TextStyle(
+                color: AppColors.brandOrangeDark,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -563,6 +810,10 @@ class _AddressDetailsSheet extends StatefulWidget {
   final String initialFullName;
   final String initialPhone;
   final String initialNotes;
+  // When editing a saved address we thread its id through so the picker
+  // can return it and the checkout screen keeps treating the selection as
+  // the same saved entry (rather than a brand-new draft).
+  final int? savedAddressId;
 
   const _AddressDetailsSheet({
     required this.latitude,
@@ -571,6 +822,7 @@ class _AddressDetailsSheet extends StatefulWidget {
     required this.initialFullName,
     required this.initialPhone,
     required this.initialNotes,
+    this.savedAddressId,
   });
 
   @override
@@ -618,6 +870,7 @@ class _AddressDetailsSheetState extends State<_AddressDetailsSheet> {
         deliveryNotes: _notesCtrl.text.trim().isEmpty
             ? null
             : _notesCtrl.text.trim(),
+        savedAddressId: widget.savedAddressId,
       ),
     );
   }
