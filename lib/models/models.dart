@@ -38,6 +38,8 @@ class OrderItem {
   final int quantity;
   final int unitPriceCents;
   final int lineTotalCents;
+  final String? rejectedAt;
+  final String? rejectionReason;
 
   OrderItem({
     required this.id,
@@ -46,7 +48,11 @@ class OrderItem {
     required this.quantity,
     required this.unitPriceCents,
     required this.lineTotalCents,
+    this.rejectedAt,
+    this.rejectionReason,
   });
+
+  bool get isRejected => rejectedAt != null;
 
   factory OrderItem.fromJson(Map<String, dynamic> j) => OrderItem(
         id: j['id'],
@@ -55,6 +61,8 @@ class OrderItem {
         quantity: j['quantity'],
         unitPriceCents: j['unitPriceCents'],
         lineTotalCents: j['lineTotalCents'],
+        rejectedAt: j['rejectedAt'],
+        rejectionReason: j['rejectionReason'],
       );
 }
 

@@ -513,14 +513,58 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                     children: [
                       const Text('ORDER ITEMS', style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      ..._order!.items.map((item) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 3),
-                            child: Row(children: [
-                              Text('${item.quantity}× ', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.brandBlue)),
-                              Expanded(child: Text(item.productName)),
-                              Text('₹${(item.lineTotalCents / 100).toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            ]),
-                          )),
+                      ..._order!.items.map((item) {
+                        final isRejected = item.isRejected;
+                        final textStyle = TextStyle(
+                          decoration: isRejected
+                              ? TextDecoration.lineThrough
+                              : TextDecoration.none,
+                          color: isRejected ? Colors.grey : null,
+                        );
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                Text(
+                                  '${item.quantity}× ',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: isRejected
+                                        ? Colors.grey
+                                        : AppColors.brandBlue,
+                                    decoration: textStyle.decoration,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Text(item.productName, style: textStyle),
+                                ),
+                                Text(
+                                  '₹${(item.lineTotalCents / 100).toStringAsFixed(0)}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    decoration: textStyle.decoration,
+                                    color: textStyle.color,
+                                  ),
+                                ),
+                              ]),
+                              if (isRejected && item.rejectionReason != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    '✕ Removed: ${item.rejectionReason}',
+                                    style: const TextStyle(
+                                      color: Color(0xFFB3261E),
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }),
                       const Divider(),
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                         const Text('Delivery', style: TextStyle(color: Colors.grey)),
