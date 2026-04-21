@@ -236,6 +236,13 @@ class ApiService {
     return Order.fromJson(data['order']);
   }
 
+  static Future<List<Order>> getMyOrders() async {
+    final data = await _req('GET', '/orders/my-orders', auth: true);
+    return ((data['orders'] ?? []) as List)
+        .map((o) => Order.fromJson(o))
+        .toList();
+  }
+
   static Future<Order> cancelOrder(String publicId) async {
     final data = await _req('POST', '/orders/$publicId/cancel');
     return Order.fromJson(data['order']);

@@ -17,7 +17,6 @@ import '../../widgets/skeleton.dart';
 import 'cart_provider.dart';
 import 'checkout_screen.dart';
 import 'profile_screen.dart';
-import 'track_order_screen.dart';
 
 class StorefrontScreen extends StatefulWidget {
   const StorefrontScreen({super.key});
@@ -181,14 +180,6 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.receipt_long_outlined, color: AppColors.ink),
-            tooltip: 'Track order',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const TrackOrderScreen()),
             ),
           ),
           Stack(

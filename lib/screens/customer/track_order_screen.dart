@@ -521,47 +521,102 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                               : TextDecoration.none,
                           color: isRejected ? Colors.grey : null,
                         );
+                        final row = Row(children: [
+                          Text(
+                            '${item.quantity}× ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: isRejected
+                                  ? Colors.grey
+                                  : AppColors.brandBlue,
+                              decoration: textStyle.decoration,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(item.productName, style: textStyle),
+                          ),
+                          Text(
+                            '₹${(item.lineTotalCents / 100).toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              decoration: textStyle.decoration,
+                              color: textStyle.color,
+                            ),
+                          ),
+                        ]);
+                        if (!isRejected) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: row,
+                          );
+                        }
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 3),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(children: [
-                                Text(
-                                  '${item.quantity}× ',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: isRejected
-                                        ? Colors.grey
-                                        : AppColors.brandBlue,
-                                    decoration: textStyle.decoration,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFFFF5F5), Color(0xFFFFECEC)],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0x59B3261E),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                row,
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
                                   ),
-                                ),
-                                Expanded(
-                                  child: Text(item.productName, style: textStyle),
-                                ),
-                                Text(
-                                  '₹${(item.lineTotalCents / 100).toStringAsFixed(0)}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    decoration: textStyle.decoration,
-                                    color: textStyle.color,
-                                  ),
-                                ),
-                              ]),
-                              if (isRejected && item.rejectionReason != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    '✕ Removed: ${item.rejectionReason}',
-                                    style: const TextStyle(
-                                      color: Color(0xFFB3261E),
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w600,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: const Color(0x59B3261E),
                                     ),
                                   ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.close_rounded,
+                                        size: 13,
+                                        color: Color(0xFFB3261E),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Removed by store',
+                                        style: TextStyle(
+                                          color: Color(0xFFB3261E),
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 11,
+                                          letterSpacing: 0.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                            ],
+                                if (item.rejectionReason != null) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Reason: ${item.rejectionReason}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF8A3B36),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         );
                       }),

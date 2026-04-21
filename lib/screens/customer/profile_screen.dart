@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_provider.dart';
 import '../../theme/tokens.dart';
+import 'my_orders_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -100,6 +101,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       if ((user.phone ?? '').isNotEmpty)
                         _Row(label: 'Phone', value: user.phone!),
                       _Row(label: 'Store', value: user.companyName),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _Card(
+                  child: Column(
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.receipt_long_rounded,
+                          color: AppColors.brandBlue,
+                        ),
+                        title: const Text(
+                          'My orders',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: const Text(
+                          'View past orders and track in-progress ones',
+                        ),
+                        trailing: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.inkFaint,
+                        ),
+                        onTap: _busy
+                            ? null
+                            : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const MyOrdersScreen(),
+                                  ),
+                                ),
+                      ),
                     ],
                   ),
                 ),
