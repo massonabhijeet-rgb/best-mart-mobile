@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
 
@@ -38,9 +40,26 @@ class NotificationsService {
     );
     await _local.initialize(
       const InitializationSettings(android: android, iOS: ios),
+      onDidReceiveNotificationResponse: (response) {
+        _handleTapPayload(response.payload);
+      },
     );
 
     FirebaseMessaging.onMessage.listen(_onForeground);
+
+    // User tapped a notification while the app was backgrounded.
+    FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+      _handleTapData(msg.data);
+    });
+
+    // App was cold-started by tapping a notification.
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null) {
+      // Defer so the first frame is rendered before we launch anything.
+      Future.delayed(const Duration(milliseconds: 300), () {
+        _handleTapData(initial.data);
+      });
+    }
   }
 
   Future<void> registerForUser() async {
@@ -90,6 +109,9 @@ class NotificationsService {
   Future<void> _onForeground(RemoteMessage msg) async {
     final n = msg.notification;
     if (n == null) return;
+    // Serialise the data map so the tap handler can recover it when the
+    // user taps the in-app notification.
+    final payload = msg.data.isEmpty ? null : jsonEncode(msg.data);
     await _local.show(
       msg.hashCode,
       n.title,
@@ -104,6 +126,28 @@ class NotificationsService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
+      payload: payload,
+    );
+  }
+
+  void _handleTapPayload(String? payload) {
+    if (payload == null || payload.isEmpty) return;
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      _handleTapData(data.map((k, v) => MapEntry(k, v?.toString() ?? '')));
+    } catch (_) {}
+  }
+
+  void _handleTapData(Map<String, dynamic> data) {
+    final url = data['url']?.toString().trim();
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) return;
+    // Open the link in the user's default browser / external app.
+    unawaited(
+      canLaunchUrl(uri).then((can) {
+        if (can) launchUrl(uri, mode: LaunchMode.externalApplication);
+      }),
     );
   }
 }
