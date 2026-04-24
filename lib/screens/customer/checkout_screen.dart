@@ -46,24 +46,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'label': 'PhonePe',
       'sub': 'Opens PhonePe directly via UPI',
       'icon': Icons.account_balance_wallet_outlined,
-      'iconUrl':
-          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/payment-icons/phonepay.png',
+      'iconAsset': 'assets/payment-icons/phonepay.png',
     },
     {
       'value': 'gpay',
       'label': 'Google Pay',
       'sub': 'Opens GPay directly via UPI',
       'icon': Icons.account_balance_wallet_outlined,
-      'iconUrl':
-          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/payment-icons/googlepay.png',
+      'iconAsset': 'assets/payment-icons/googlepay.png',
     },
     {
       'value': 'paytm',
       'label': 'Paytm',
       'sub': 'Opens Paytm directly via UPI',
       'icon': Icons.account_balance_wallet_outlined,
-      'iconUrl':
-          'https://bestmart-images-prod.s3.eu-north-1.amazonaws.com/payment-icons/paytm.png',
+      'iconAsset': 'assets/payment-icons/paytm.png',
     },
     {
       'value': 'razorpay',
@@ -97,9 +94,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     'paytm': 'paytm',
   };
 
-  Future<void>? _iconsPrecache;
-  bool _iconsPrecacheStarted = false;
-
   @override
   void initState() {
     super.initState();
@@ -110,27 +104,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _emailCtrl.text = user.email;
       _loadSavedAddresses();
     }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_iconsPrecacheStarted) {
-      _iconsPrecacheStarted = true;
-      _iconsPrecache = _precachePaymentIcons();
-    }
-  }
-
-  Future<void> _precachePaymentIcons() async {
-    final urls = _payMethods
-        .map((m) => m['iconUrl'] as String?)
-        .whereType<String>()
-        .toList();
-    await Future.wait(urls.map((u) async {
-      try {
-        await precacheImage(NetworkImage(u), context);
-      } catch (_) {}
-    }));
   }
 
   Future<void> _loadSavedAddresses() async {
@@ -209,7 +182,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   IconData _paymentIcon() => _paymentEntry()['icon'] as IconData;
 
-  String? _paymentIconUrl() => _paymentEntry()['iconUrl'] as String?;
+  String? _paymentIconAsset() => _paymentEntry()['iconAsset'] as String?;
 
   bool get _hasValidAddress =>
       _selectedAddressId != null ||
@@ -240,10 +213,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _openPaymentSheet() async {
     HapticFeedback.selectionClick();
-    if (_iconsPrecache != null) {
-      await _iconsPrecache;
-    }
-    if (!mounted) return;
     final picked = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -288,7 +257,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     label: p['label'] as String,
                     subtitle: p['sub'] as String,
                     icon: p['icon'] as IconData,
-                    iconUrl: p['iconUrl'] as String?,
+                    iconAsset: p['iconAsset'] as String?,
                     selected: _payment == p['value'],
                     onTap: () =>
                         Navigator.of(sheetContext).pop(p['value'] as String),
@@ -706,7 +675,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         addressLine: _addressCtrl.text,
         addressLabel: _selectedAddressLabel,
         paymentIcon: _paymentIcon(),
-        paymentIconUrl: _paymentIconUrl(),
+        paymentIconAsset: _paymentIconAsset(),
         onChangeAddress: _hasValidAddress
             ? () => _openAddressPicker(useCurrentLocation: false)
             : () => _openAddressPicker(
@@ -758,7 +727,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     key: _paymentSectionKey,
                     label: _paymentLabel(),
                     icon: _paymentIcon(),
-                    iconUrl: _paymentIconUrl(),
+                    iconAsset: _paymentIconAsset(),
                     onChange: _openPaymentSheet,
                   ),
                   if (_error.isNotEmpty) ...[
@@ -1101,13 +1070,13 @@ class _EtaHero extends StatelessWidget {
 class _PaymentSummaryCard extends StatelessWidget {
   final String label;
   final IconData icon;
-  final String? iconUrl;
+  final String? iconAsset;
   final VoidCallback onChange;
   const _PaymentSummaryCard({
     super.key,
     required this.label,
     required this.icon,
-    this.iconUrl,
+    this.iconAsset,
     required this.onChange,
   });
 
@@ -1132,22 +1101,23 @@ class _PaymentSummaryCard extends StatelessWidget {
                 height: 36,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: iconUrl != null
+                  color: iconAsset != null
                       ? AppColors.surface
                       : AppColors.brandBlue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
-                  border: iconUrl != null
+                  border: iconAsset != null
                       ? Border.all(color: AppColors.borderSoft)
                       : null,
                 ),
-                child: iconUrl != null
+                child: iconAsset != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: Padding(
                           padding: const EdgeInsets.all(4),
-                          child: Image.network(
-                            iconUrl!,
+                          child: Image.asset(
+                            iconAsset!,
                             fit: BoxFit.contain,
+                            cacheWidth: 128,
                             errorBuilder: (_, __, ___) => Icon(icon,
                                 color: AppColors.brandBlue, size: 20),
                           ),
@@ -1206,14 +1176,14 @@ class _PaymentTile extends StatelessWidget {
   final String label;
   final String subtitle;
   final IconData icon;
-  final String? iconUrl;
+  final String? iconAsset;
   final bool selected;
   final VoidCallback onTap;
   const _PaymentTile({
     required this.label,
     required this.subtitle,
     required this.icon,
-    this.iconUrl,
+    this.iconAsset,
     required this.selected,
     required this.onTap,
   });
@@ -1245,24 +1215,25 @@ class _PaymentTile extends StatelessWidget {
                   height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: iconUrl != null
+                    color: iconAsset != null
                         ? AppColors.surface
                         : (selected
                             ? AppColors.brandBlue
                             : AppColors.brandBlue.withValues(alpha: 0.1)),
                     borderRadius: AppRadius.brSm,
-                    border: iconUrl != null
+                    border: iconAsset != null
                         ? Border.all(color: AppColors.borderSoft)
                         : null,
                   ),
-                  child: iconUrl != null
+                  child: iconAsset != null
                       ? ClipRRect(
                           borderRadius: AppRadius.brSm,
                           child: Padding(
                             padding: const EdgeInsets.all(4),
-                            child: Image.network(
-                              iconUrl!,
+                            child: Image.asset(
+                              iconAsset!,
                               fit: BoxFit.contain,
+                              cacheWidth: 128,
                               errorBuilder: (_, __, ___) => Icon(
                                 icon,
                                 color: AppColors.brandBlue,
@@ -1324,7 +1295,7 @@ class _StickyCheckoutBar extends StatelessWidget {
   final VoidCallback onPlace;
   final String paymentLabel;
   final IconData paymentIcon;
-  final String? paymentIconUrl;
+  final String? paymentIconAsset;
   final VoidCallback onChangePayment;
   final bool hasAddress;
   final String addressLine;
@@ -1337,7 +1308,7 @@ class _StickyCheckoutBar extends StatelessWidget {
     required this.onPlace,
     required this.paymentLabel,
     required this.paymentIcon,
-    required this.paymentIconUrl,
+    required this.paymentIconAsset,
     required this.onChangePayment,
     required this.hasAddress,
     required this.addressLine,
@@ -1388,7 +1359,7 @@ class _StickyCheckoutBar extends StatelessWidget {
                   _PayUsingButton(
                     label: paymentLabel,
                     icon: paymentIcon,
-                    iconUrl: paymentIconUrl,
+                    iconAsset: paymentIconAsset,
                     onTap: placing ? () {} : onChangePayment,
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -1520,12 +1491,12 @@ class _DeliveryHeaderStrip extends StatelessWidget {
 class _PayUsingButton extends StatelessWidget {
   final String label;
   final IconData icon;
-  final String? iconUrl;
+  final String? iconAsset;
   final VoidCallback onTap;
   const _PayUsingButton({
     required this.label,
     required this.icon,
-    required this.iconUrl,
+    required this.iconAsset,
     required this.onTap,
   });
 
@@ -1548,22 +1519,23 @@ class _PayUsingButton extends StatelessWidget {
                   height: 24,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: iconUrl != null
+                    color: iconAsset != null
                         ? AppColors.surface
                         : AppColors.brandBlue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
-                    border: iconUrl != null
+                    border: iconAsset != null
                         ? Border.all(color: AppColors.borderSoft)
                         : null,
                   ),
-                  child: iconUrl != null
+                  child: iconAsset != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(6),
                           child: Padding(
                             padding: const EdgeInsets.all(2),
-                            child: Image.network(
-                              iconUrl!,
+                            child: Image.asset(
+                              iconAsset!,
                               fit: BoxFit.contain,
+                              cacheWidth: 96,
                               errorBuilder: (_, __, ___) => Icon(
                                 icon,
                                 color: AppColors.brandBlue,
