@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/home_provider.dart';
+import '../../providers/shop_status_provider.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/brand_strip.dart';
 import '../../widgets/cart_preview_sheet.dart';
@@ -131,13 +132,19 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final home = context.watch<HomeProvider>();
+    final shop = context.watch<ShopStatusProvider>();
 
     _maybeShowCampaignPopup(home);
 
     return Scaffold(
       backgroundColor: AppColors.pageBg,
       appBar: _appBar(cart),
-      body: _body(home),
+      body: Column(
+        children: [
+          if (shop.isClosed) _ShopClosedBanner(message: shop.closedMessage),
+          Expanded(child: _body(home)),
+        ],
+      ),
       floatingActionButton: _CartFab(cart: cart),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
@@ -772,6 +779,61 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
         delegate: SliverChildBuilderDelegate(
           (_, i) => ProductCard(product: items[i], width: double.infinity),
           childCount: items.length,
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopClosedBanner extends StatelessWidget {
+  final String message;
+  const _ShopClosedBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFFEF2F2),
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.storefront_rounded,
+                color: Color(0xFFB91C1C),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Shop closed',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF7F1D1D),
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                    if (message.trim().isNotEmpty)
+                      Text(
+                        message,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF991B1B),
+                          height: 1.3,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

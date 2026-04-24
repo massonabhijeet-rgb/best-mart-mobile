@@ -285,4 +285,18 @@ class ApiService {
     return Map<String, dynamic>.from(data);
   }
 
+  // Shop open/closed status — derived from /company/public so no new
+  // backend endpoint needed. Returns a safe-default "open" on any error.
+  static Future<ShopStatus> getShopStatus() async {
+    try {
+      final data = await _req('GET', '/company/public');
+      final company = data['company'];
+      if (company is Map && company['settings'] is Map) {
+        return ShopStatus.fromJson(
+          Map<String, dynamic>.from(company['settings'] as Map),
+        );
+      }
+    } catch (_) {}
+    return ShopStatus.open();
+  }
 }

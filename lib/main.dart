@@ -6,6 +6,7 @@ import 'services/auth_provider.dart';
 import 'services/notifications_service.dart';
 import 'services/socket_service.dart';
 import 'providers/home_provider.dart';
+import 'providers/shop_status_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/customer/storefront_screen.dart';
 import 'screens/customer/cart_provider.dart';
@@ -20,12 +21,15 @@ void main() async {
     unawaited(NotificationsService.instance.registerForUser());
   }
   SocketService.instance.connect();
+  final shopStatus = ShopStatusProvider();
+  unawaited(shopStatus.init());
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: auth),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => HomeProvider()),
+        ChangeNotifierProvider.value(value: shopStatus),
       ],
       child: const BestMartApp(),
     ),

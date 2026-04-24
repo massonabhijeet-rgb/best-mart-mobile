@@ -567,3 +567,25 @@ class RiderLocation {
         updatedAt: j['updatedAt'],
       );
 }
+
+class ShopStatus {
+  final bool shopOpen;
+  final String shopClosedMessage;
+
+  const ShopStatus({
+    required this.shopOpen,
+    required this.shopClosedMessage,
+  });
+
+  factory ShopStatus.open() => const ShopStatus(
+        shopOpen: true,
+        shopClosedMessage: '',
+      );
+
+  factory ShopStatus.fromJson(Map<String, dynamic> j) => ShopStatus(
+        shopOpen: (j['shopOpen'] as bool?) ?? true,
+        shopClosedMessage:
+            (j['shopClosedMessage'] as String?) ??
+                "We're closed right now. Come back tomorrow!",
+      );
+}

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../providers/shop_status_provider.dart';
 import '../screens/customer/cart_provider.dart';
 import '../screens/customer/checkout_screen.dart';
 import '../theme/tokens.dart';
@@ -23,6 +24,7 @@ class CartPreviewSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
+    final shop = context.watch<ShopStatusProvider>();
     final items = cart.items.values.toList();
     final freeThreshold = CartProvider.freeDeliveryThresholdCents;
     final remaining = freeThreshold - cart.subtotalCents;
@@ -244,44 +246,59 @@ class CartPreviewSheet extends StatelessWidget {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () {
-                              HapticFeedback.mediumImpact();
-                              Navigator.pop(ctx);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const CheckoutScreen(),
-                                ),
-                              );
-                            },
+                            onTap: shop.isClosed
+                                ? null
+                                : () {
+                                    HapticFeedback.mediumImpact();
+                                    Navigator.pop(ctx);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const CheckoutScreen(),
+                                      ),
+                                    );
+                                  },
                             borderRadius: AppRadius.brMd,
                             child: Ink(
                               decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    AppColors.brandBlue,
-                                    AppColors.brandBlueDark,
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
+                                gradient: shop.isClosed
+                                    ? const LinearGradient(
+                                        colors: [
+                                          Color(0xFF9CA3AF),
+                                          Color(0xFF6B7280),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      )
+                                    : const LinearGradient(
+                                        colors: [
+                                          AppColors.brandBlue,
+                                          AppColors.brandBlueDark,
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
                                 borderRadius: AppRadius.brMd,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.brandBlue
-                                        .withValues(alpha: 0.4),
-                                    blurRadius: 14,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
+                                boxShadow: shop.isClosed
+                                    ? null
+                                    : [
+                                        BoxShadow(
+                                          color: AppColors.brandBlue
+                                              .withValues(alpha: 0.4),
+                                          blurRadius: 14,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
                               ),
-                              child: const Center(
+                              child: Center(
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      'Go to checkout',
-                                      style: TextStyle(
+                                      shop.isClosed
+                                          ? 'Store closed'
+                                          : 'Go to checkout',
+                                      style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w900,
                                         fontSize: 14,

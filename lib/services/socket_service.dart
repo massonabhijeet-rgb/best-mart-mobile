@@ -17,10 +17,12 @@ class SocketService {
   final _newOrderController = StreamController<Order>.broadcast();
   final _orderUpdatedController = StreamController<Order>.broadcast();
   final _riderLocationController = StreamController<RiderLocation>.broadcast();
+  final _shopStatusController = StreamController<ShopStatus>.broadcast();
 
   Stream<Order> get onNewOrder => _newOrderController.stream;
   Stream<Order> get onOrderUpdated => _orderUpdatedController.stream;
   Stream<RiderLocation> get onRiderLocation => _riderLocationController.stream;
+  Stream<ShopStatus> get onShopStatusChanged => _shopStatusController.stream;
 
   void connect() {
     _destroyed = false;
@@ -42,6 +44,10 @@ class SocketService {
               _orderUpdatedController.add(Order.fromJson(data['payload']));
             } else if (type == 'rider_location') {
               _riderLocationController.add(RiderLocation.fromJson(data['payload']));
+            } else if (type == 'shop_status_changed' && data['payload'] is Map) {
+              _shopStatusController.add(ShopStatus.fromJson(
+                Map<String, dynamic>.from(data['payload'] as Map),
+              ));
             }
           } catch (_) {}
         },
