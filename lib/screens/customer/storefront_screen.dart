@@ -271,7 +271,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
         ),
       ),
       floatingActionButton: _CartFab(cart: cart),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
 
@@ -1438,7 +1438,7 @@ class _CartFab extends StatelessWidget {
                     ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 8, AppSpacing.md, 8),
+                    padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1446,8 +1446,8 @@ class _CartFab extends StatelessWidget {
                           clipBehavior: Clip.none,
                           children: [
                             Container(
-                              width: 36,
-                              height: 36,
+                              width: 32,
+                              height: 32,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.22),
@@ -1457,7 +1457,7 @@ class _CartFab extends StatelessWidget {
                               child: const Icon(
                                 Icons.shopping_bag_rounded,
                                 color: Colors.white,
-                                size: 18,
+                                size: 16,
                               ),
                             ),
                             Positioned(
@@ -1470,9 +1470,9 @@ class _CartFab extends StatelessWidget {
                                 child: Container(
                                   key: ValueKey(cart.totalItems),
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 5, vertical: 1),
+                                      horizontal: 4, vertical: 1),
                                   constraints: const BoxConstraints(
-                                      minWidth: 16, minHeight: 16),
+                                      minWidth: 15, minHeight: 15),
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     color: AppColors.brandOrange,
@@ -1494,54 +1494,20 @@ class _CartFab extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${cart.totalItems} ${cart.totalItems == 1 ? "item" : "items"}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.2,
-                              ),
+                        const SizedBox(width: 8),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: Text(
+                            '₹${(cart.subtotalCents / 100).toStringAsFixed(0)}',
+                            key: ValueKey(cart.subtotalCents),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
                             ),
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              child: Text(
-                                '₹${(cart.subtotalCents / 100).toStringAsFixed(0)}',
-                                key: ValueKey(cart.subtotalCents),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Container(
-                          height: 28,
-                          width: 1,
-                          color: Colors.white.withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        const Text(
-                          'Checkout',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.3,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.arrow_forward_rounded,
-                            color: Colors.white, size: 16),
                       ],
                     ),
                   ),

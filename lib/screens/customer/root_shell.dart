@@ -69,7 +69,7 @@ class _BottomNav extends StatelessWidget {
         // BackdropFilter combined to claim half the screen on iOS.
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
         child: SizedBox(
-          height: 54,
+          height: 48,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(28),
             child: BackdropFilter(
@@ -171,14 +171,14 @@ class _NavItem extends StatelessWidget {
                 children: [
                   Icon(
                     selected ? activeIcon : icon,
-                    size: 19,
+                    size: 16,
                     color: color,
                   ),
                   const SizedBox(height: 1),
                   Text(
                     label,
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                       color: color,
                     ),
