@@ -79,8 +79,8 @@ class _BottomNav extends StatelessWidget {
               ),
               _NavItem(
                 label: 'Order Again',
-                icon: Icons.refresh_rounded,
-                activeIcon: Icons.refresh_rounded,
+                icon: Icons.shopping_bag_outlined,
+                activeIcon: Icons.shopping_bag_rounded,
                 selected: active == 1,
                 onTap: () => onTap(1),
               ),
@@ -116,7 +116,10 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.brandBlue : AppColors.inkFaint;
+    // No accent colour on either state — active vs inactive is conveyed by
+    // the icon switch (outlined → filled) and the text weight (medium →
+    // bold). Keeps the nav reading as utility chrome rather than a CTA bar.
+    final color = selected ? AppColors.ink : AppColors.inkFaint;
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -125,13 +128,13 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(selected ? activeIcon : icon, size: 24, color: color),
+              Icon(selected ? activeIcon : icon, size: 23, color: color),
               const SizedBox(height: 2),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   color: color,
                 ),
               ),
