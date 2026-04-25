@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -406,8 +407,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     // Top-level (parent) categories surface here. If none are configured
     // we fall back to the full flat list so the row never goes empty.
     final tops = home.categories.where((c) => c.parentId == null).toList();
-    final pool = tops.isNotEmpty ? tops : home.categories;
-    final picks = pool.take(4).toList();
+    final picks = tops.isNotEmpty ? tops : home.categories;
 
     return SizedBox(
       height: 80,
@@ -428,6 +428,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
               label: c.name,
               icon: spec.$1,
               color: spec.$2,
+              imageUrl: c.imageUrl,
               selected: home.categoryId == c.id,
               onTap: () =>
                   home.setCategory(home.categoryId == c.id ? null : c.id),
@@ -1124,13 +1125,16 @@ class _RailTheme {
   const _RailTheme({required this.emoji, required this.tint});
 }
 
-/// Icon-on-top chip used in the hero band's top-row. Each chip carries
-/// its own accent colour — saturated icon over a low-alpha pastel
-/// circle. Active item picks up a 2px ink underline + bold label.
+/// Icon-on-top chip used in the hero band's top-row. If the category
+/// has an admin-uploaded imageUrl, we render that as the avatar so
+/// the chip shows the *actual* product imagery instead of a generic
+/// keyword-mapped icon. Falls back to a Material icon over a pastel
+/// circle when no image is set.
 class _CatIconChip extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
+  final String? imageUrl;
   final bool selected;
   final VoidCallback onTap;
   const _CatIconChip({
@@ -1139,10 +1143,12 @@ class _CatIconChip extends StatelessWidget {
     required this.color,
     required this.selected,
     required this.onTap,
+    this.imageUrl,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: InkWell(
@@ -1152,7 +1158,7 @@ class _CatIconChip extends StatelessWidget {
         },
         borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Container(
-          width: 64,
+          width: 68,
           padding: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
             border: Border(
@@ -1166,14 +1172,34 @@ class _CatIconChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.16),
+                  color: hasImage
+                      ? AppColors.surface
+                      : color.withValues(alpha: 0.16),
                   shape: BoxShape.circle,
+                  border: hasImage
+                      ? Border.all(color: AppColors.borderSoft)
+                      : null,
                 ),
-                child: Icon(icon, color: color, size: 22),
+                child: hasImage
+                    ? ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: imageUrl!,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 144,
+                          memCacheHeight: 144,
+                          placeholder: (_, __) =>
+                              const SizedBox(width: 48, height: 48),
+                          errorWidget: (_, __, ___) =>
+                              Icon(icon, color: color, size: 24),
+                        ),
+                      )
+                    : Icon(icon, color: color, size: 24),
               ),
               const SizedBox(height: 4),
               Text(
@@ -1441,40 +1467,56 @@ class _DeliveryHeaderState extends State<_DeliveryHeader> {
                 borderRadius: BorderRadius.circular(AppRadius.sm),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'HOME · ',
-                        style: TextStyle(
-                          color: AppColors.ink,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                      Flexible(
-                        child: Text(
-                          _picked?.deliveryAddress.trim().isNotEmpty == true
-                              ? _picked!.deliveryAddress
-                              : 'Tap to set delivery address',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  child: Builder(builder: (ctx) {
+                    // Prefer the saved address's name (it's the contact
+                    // we'd hand to the rider), fall back to the logged-in
+                    // user's profile name.
+                    final picked = _picked;
+                    final pickedName = picked?.fullName.trim() ?? '';
+                    final authName =
+                        ctx.watch<AuthProvider>().user?.fullName?.trim() ?? '';
+                    final name = pickedName.isNotEmpty
+                        ? pickedName
+                        : authName.isNotEmpty
+                            ? authName
+                            : 'Set name';
+                    final addressLine =
+                        (picked?.deliveryAddress.trim().isNotEmpty == true)
+                            ? picked!.deliveryAddress
+                            : 'Tap to set delivery address';
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          '$name · ',
                           style: const TextStyle(
-                            color: AppColors.inkMuted,
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w900,
                             fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.1,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 2),
-                      const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 18,
-                        color: AppColors.inkMuted,
-                      ),
-                    ],
-                  ),
+                        Flexible(
+                          child: Text(
+                            addressLine,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.inkMuted,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 18,
+                          color: AppColors.inkMuted,
+                        ),
+                      ],
+                    );
+                  }),
                 ),
               ),
             ),
