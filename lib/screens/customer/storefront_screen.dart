@@ -20,7 +20,6 @@ import '../../widgets/product_card.dart';
 import '../../widgets/section_background.dart';
 import '../../widgets/skeleton.dart';
 import 'cart_provider.dart';
-import 'checkout_screen.dart';
 import 'profile_screen.dart';
 
 class StorefrontScreen extends StatefulWidget {
@@ -240,7 +239,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     return Scaffold(
       backgroundColor: AppColors.pageBg,
       extendBodyBehindAppBar: true,
-      appBar: _appBar(cart),
+      appBar: _appBar(),
       body: Container(
         // Solid light-blue hero band (top ~30% — covers app bar, delivery
         // header, search bar, and category icon row) that transitions
@@ -276,7 +275,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     );
   }
 
-  PreferredSizeWidget _appBar(CartProvider cart) => AppBar(
+  PreferredSizeWidget _appBar() => AppBar(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -324,51 +323,8 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline, color: AppColors.ink),
-            tooltip: 'Profile',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            ),
-          ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.shopping_cart_outlined,
-                    color: AppColors.ink),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CheckoutScreen()),
-                ),
-              ),
-              if (cart.totalItems > 0)
-                Positioned(
-                  right: 6,
-                  top: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 1),
-                    constraints:
-                        const BoxConstraints(minWidth: 18, minHeight: 18),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.brandGreen,
-                      borderRadius: BorderRadius.circular(AppRadius.full),
-                    ),
-                    child: Text(
-                      '${cart.totalItems}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(width: AppSpacing.sm),
+          const _ProfileAvatarButton(),
+          const SizedBox(width: AppSpacing.md),
         ],
       );
 
@@ -1378,6 +1334,60 @@ class _ShopClosedBanner extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileAvatarButton extends StatelessWidget {
+  const _ProfileAvatarButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+    final source = (user?.fullName ?? '').trim().isNotEmpty
+        ? user!.fullName!.trim()
+        : (user?.email ?? '').trim();
+    final initial =
+        source.isNotEmpty ? source.characters.first.toUpperCase() : '';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProfileScreen()),
+          ),
+          child: Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.surface,
+              border: Border.all(color: AppColors.borderSoft, width: 1),
+            ),
+            child: initial.isEmpty
+                ? const Icon(
+                    Icons.person_rounded,
+                    size: 20,
+                    color: AppColors.brandBlueDark,
+                  )
+                : Text(
+                    initial,
+                    style: const TextStyle(
+                      color: AppColors.brandBlueDark,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
+                  ),
           ),
         ),
       ),
