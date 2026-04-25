@@ -16,10 +16,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final auth = AuthProvider();
   await auth.init();
-  await NotificationsService.instance.init();
-  if (auth.isLoggedIn) {
-    unawaited(NotificationsService.instance.registerForUser());
-  }
+  unawaited(NotificationsService.instance.init().then((_) {
+    if (auth.isLoggedIn) {
+      NotificationsService.instance.registerForUser();
+    }
+  }));
   SocketService.instance.connect();
   final shopStatus = ShopStatusProvider();
   unawaited(shopStatus.init());
