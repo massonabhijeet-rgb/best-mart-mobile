@@ -142,19 +142,20 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       extendBodyBehindAppBar: true,
       appBar: _appBar(cart),
       body: Container(
-        // Soft brand-blue gradient gives the page a sense of depth without
-        // changing the palette; cards float over a tinted surface so the
-        // frosted-glass top bar has something interesting to blur.
+        // Solid light-blue hero band (top ~30% — covers app bar, delivery
+        // header, search bar, and category icon row) that transitions
+        // sharply to white. Mirrors the Blinkit reference but in our
+        // brand palette instead of yellow.
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFE1ECFD),
-              Color(0xFFEDF2FF),
-              Color(0xFFF7F9FF),
+              Color(0xFFD4E5FB),
+              Color(0xFFD4E5FB),
+              Color(0xFFFFFFFF),
             ],
-            stops: [0, 0.35, 1],
+            stops: [0, 0.34, 0.40],
           ),
         ),
         // Manually inset for status bar + AppBar height because the
@@ -399,42 +400,34 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
 
   Widget _categoryChips(HomeProvider home) {
     if (home.categories.isEmpty) return const SizedBox.shrink();
+    // Top-level (parent) categories surface here. If none are configured
+    // we fall back to the full flat list so the row never goes empty.
+    final tops = home.categories.where((c) => c.parentId == null).toList();
+    final pool = tops.isNotEmpty ? tops : home.categories;
+    final picks = pool.take(4).toList();
+
     return SizedBox(
-      height: 48,
-      child: ShaderMask(
-        shaderCallback: (rect) => const LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          stops: [0, 0.04, 0.94, 1],
-          colors: [
-            Colors.transparent,
-            Colors.black,
-            Colors.black,
-            Colors.transparent,
-          ],
-        ).createShader(rect),
-        blendMode: BlendMode.dstIn,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          children: [
-            _CatChip(
-              label: 'All',
-              icon: '✨',
-              selected: home.categoryId == null,
-              onTap: () => home.setCategory(null),
+      height: 64,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        children: [
+          _CatIconChip(
+            label: 'All',
+            icon: '🛒',
+            selected: home.categoryId == null,
+            onTap: () => home.setCategory(null),
+          ),
+          ...picks.map(
+            (c) => _CatIconChip(
+              label: c.name,
+              icon: _emojiForCategory(c.name),
+              selected: home.categoryId == c.id,
+              onTap: () =>
+                  home.setCategory(home.categoryId == c.id ? null : c.id),
             ),
-            ...home.categories.map(
-              (c) => _CatChip(
-                label: c.name,
-                icon: _emojiForCategory(c.name),
-                selected: home.categoryId == c.id,
-                onTap: () =>
-                    home.setCategory(home.categoryId == c.id ? null : c.id),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1097,94 +1090,64 @@ class _RailTheme {
   const _RailTheme({required this.emoji, required this.tint});
 }
 
-class _CatChip extends StatelessWidget {
+/// Icon-on-top chip used in the hero band's top-row. Active item picks
+/// up a bold label + a 2px ink underline; inactive items stay neutral
+/// so the row reads as a department selector rather than a CTA.
+class _CatIconChip extends StatelessWidget {
   final String label;
-  final String? icon;
+  final String icon;
   final bool selected;
   final VoidCallback onTap;
-  const _CatChip({
+  const _CatIconChip({
     required this.label,
+    required this.icon,
     required this.selected,
     required this.onTap,
-    this.icon,
   });
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(right: AppSpacing.sm),
-        child: AnimatedScale(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutBack,
-          scale: selected ? 1.05 : 1.0,
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onTap();
-            },
-            borderRadius: BorderRadius.circular(AppRadius.full),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              alignment: Alignment.center,
-              padding: EdgeInsets.fromLTRB(
-                icon != null ? AppSpacing.sm : AppSpacing.lg,
-                AppSpacing.sm,
-                AppSpacing.lg,
-                AppSpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                color: selected
-                    ? AppColors.brandBlue
-                    : AppColors.surface.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(AppRadius.full),
-                border: Border.all(
-                  color: selected ? AppColors.brandBlue : AppColors.borderSoft,
-                  width: selected ? 1.4 : 1,
-                ),
-                boxShadow: selected
-                    ? [
-                        BoxShadow(
-                          color: AppColors.brandBlue.withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ]
-                    : AppShadow.soft,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (icon != null) ...[
-                    Container(
-                      width: 22,
-                      height: 22,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? Colors.white.withValues(alpha: 0.22)
-                            : AppColors.pageBg,
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                      child: Text(icon!, style: const TextStyle(fontSize: 13)),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: selected ? Colors.white : AppColors.ink,
-                      fontWeight:
-                          selected ? FontWeight.w800 : FontWeight.w700,
-                      fontSize: 13,
-                      letterSpacing: selected ? 0.2 : 0,
-                    ),
-                  ),
-                ],
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: Container(
+          width: 64,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: selected ? AppColors.ink : Colors.transparent,
+                width: 2,
               ),
             ),
           ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(icon, style: const TextStyle(fontSize: 26)),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.ink,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _ContextBanner extends StatelessWidget {
@@ -1290,7 +1253,7 @@ class _DeliveryHeader extends StatelessWidget {
     return Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.md,
-          AppSpacing.md,
+          AppSpacing.sm,
           AppSpacing.md,
           0,
         ),
@@ -1298,12 +1261,12 @@ class _DeliveryHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Delivery in',
+              'BestMart in',
               style: TextStyle(
-                color: AppColors.inkFaint,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                letterSpacing: 0.3,
+                color: AppColors.ink,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                letterSpacing: -0.1,
               ),
             ),
             const SizedBox(height: 2),
@@ -1315,30 +1278,30 @@ class _DeliveryHeader extends StatelessWidget {
                   style: TextStyle(
                     color: AppColors.ink,
                     fontWeight: FontWeight.w900,
-                    fontSize: 26,
-                    letterSpacing: -0.6,
-                    height: 1.1,
+                    fontSize: 32,
+                    letterSpacing: -0.8,
+                    height: 1.05,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
+                      horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.brandBlue.withValues(alpha: 0.12),
+                    color: AppColors.brandBlue.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.bolt,
-                          size: 13, color: AppColors.brandBlue),
-                      SizedBox(width: 2),
+                      Icon(Icons.storefront_rounded,
+                          size: 14, color: AppColors.brandBlueDark),
+                      SizedBox(width: 4),
                       Text(
                         'Express',
                         style: TextStyle(
-                          color: AppColors.brandBlue,
-                          fontSize: 11,
+                          color: AppColors.brandBlueDark,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -1347,23 +1310,36 @@ class _DeliveryHeader extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            const Row(
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(Icons.location_on_outlined,
-                    size: 13, color: AppColors.inkMuted),
-                SizedBox(width: 3),
-                Flexible(
+                const Text(
+                  'HOME · ',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const Flexible(
                   child: Text(
                     'Delivering to your doorstep',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: AppColors.inkMuted,
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 18,
+                  color: AppColors.inkMuted,
                 ),
               ],
             ),
