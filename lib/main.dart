@@ -8,8 +8,8 @@ import 'services/socket_service.dart';
 import 'providers/home_provider.dart';
 import 'providers/shop_status_provider.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/customer/storefront_screen.dart';
 import 'screens/customer/cart_provider.dart';
+import 'screens/customer/root_shell.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -59,6 +59,6 @@ class _Root extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     if (auth.loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (!auth.isLoggedIn) return const LoginScreen();
-    return const StorefrontScreen();
+    return const RootShell();
   }
 }

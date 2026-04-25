@@ -33,6 +33,7 @@ class User {
 
 class OrderItem {
   final int id;
+  final int? productId;
   final String productName;
   final String unitLabel;
   final int quantity;
@@ -43,6 +44,7 @@ class OrderItem {
 
   OrderItem({
     required this.id,
+    this.productId,
     required this.productName,
     required this.unitLabel,
     required this.quantity,
@@ -56,6 +58,7 @@ class OrderItem {
 
   factory OrderItem.fromJson(Map<String, dynamic> j) => OrderItem(
         id: j['id'],
+        productId: (j['productId'] as num?)?.toInt(),
         productName: j['productName'],
         unitLabel: j['unitLabel'],
         quantity: j['quantity'],
@@ -266,12 +269,14 @@ class Category {
   final String name;
   final int productCount;
   final String? imageUrl;
+  final int? parentId;
 
   Category({
     required this.id,
     required this.name,
     required this.productCount,
     this.imageUrl,
+    this.parentId,
   });
 
   factory Category.fromJson(Map<String, dynamic> j) => Category(
@@ -279,6 +284,7 @@ class Category {
         name: j['name'],
         productCount: j['productCount'] ?? 0,
         imageUrl: j['imageUrl'],
+        parentId: (j['parentId'] as num?)?.toInt(),
       );
 }
 
