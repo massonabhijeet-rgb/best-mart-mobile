@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../providers/shop_status_provider.dart';
 import '../screens/customer/cart_provider.dart';
 import '../theme/tokens.dart';
 import 'quick_view_sheet.dart';
@@ -265,7 +266,11 @@ class _SpeedChip extends StatelessWidget {
   const _SpeedChip();
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) {
+    if (context.watch<ShopStatusProvider>().isClosed) {
+      return const SizedBox.shrink();
+    }
+    return Container(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
         decoration: BoxDecoration(
           color: AppColors.ink.withValues(alpha: 0.78),
@@ -288,6 +293,7 @@ class _SpeedChip extends StatelessWidget {
           ],
         ),
       );
+  }
 }
 
 class _ProductImage extends StatelessWidget {

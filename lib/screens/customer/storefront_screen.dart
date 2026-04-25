@@ -565,15 +565,19 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       addGap();
     }
 
+    final isClosed = context.read<ShopStatusProvider>().isClosed;
     final ordered = _prioritizedRails(rails.categoryRails);
     for (var i = 0; i < ordered.length; i++) {
       final rail = ordered[i];
       if (rail.products.isEmpty) continue;
       final theme = _railThemes[(i + 1) % _railThemes.length];
+      final subtitle = isClosed
+          ? '${rail.products.length}+ picks'
+          : '${rail.products.length}+ picks · delivered in 15 min';
       slivers.add(SliverToBoxAdapter(
         child: HomeRail(
           title: 'Top in ${rail.name}',
-          subtitle: '${rail.products.length}+ picks · delivered in 15 min',
+          subtitle: subtitle,
           emoji: theme.emoji,
           tint: theme.tint,
           products: rail.products,
@@ -1190,7 +1194,11 @@ class _DeliveryHeader extends StatelessWidget {
   const _DeliveryHeader();
 
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) {
+    if (context.watch<ShopStatusProvider>().isClosed) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.md,
           AppSpacing.md,
@@ -1254,6 +1262,7 @@ class _DeliveryHeader extends StatelessWidget {
           ],
         ),
       );
+  }
 }
 
 class _ErrorView extends StatelessWidget {
