@@ -187,6 +187,38 @@ class ApiService {
         .toList();
   }
 
+  // Fire-and-forget log of a search query so it shows up in this
+  // user's recent searches next time. Server short-circuits on
+  // queries shorter than 2 characters.
+  static Future<void> logSearch(String query) async {
+    try {
+      await _req('POST', '/products/search/log',
+          body: {'query': query}, auth: true);
+    } catch (_) {
+      // Telemetry is non-critical — never let it break a search.
+    }
+  }
+
+  // Most-recent distinct search queries the signed-in user has run.
+  // Powers the chip list shown when the search bar is focused + empty.
+  static Future<List<String>> getSearchHistory() async {
+    try {
+      final data = await _req('GET', '/products/search/history', auth: true);
+      final list = (data['queries'] as List?) ?? const [];
+      return list.map((e) => e.toString()).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<void> clearSearchHistory() async {
+    try {
+      await _req('DELETE', '/products/search/history', auth: true);
+    } catch (_) {
+      // Best-effort: UI clears local list optimistically anyway.
+    }
+  }
+
   static Future<List<Product>> getProductVariants(String uniqueId) async {
     final data = await _req('GET', '/products/$uniqueId/variants');
     return ((data['variants'] ?? []) as List)

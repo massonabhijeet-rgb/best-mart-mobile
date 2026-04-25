@@ -31,10 +31,15 @@ class StorefrontScreen extends StatefulWidget {
 
 class _StorefrontScreenState extends State<StorefrontScreen> {
   final _searchCtrl = TextEditingController();
+  final _searchFocus = FocusNode();
   final _scrollCtrl = ScrollController();
   Timer? _searchDebounce;
   Timer? _hintRotator;
   int _hintIndex = 0;
+  Timer? _searchLogger;
+  // Recent search chips. Loaded once on first focus + after each clear.
+  List<String> _searchHistory = const [];
+  bool _historyLoaded = false;
 
   // "More from <category>" cache. Keyed by `<search>|<categoryId>` so we
   // re-fetch when either changes, but never thrash on every grid scroll.
@@ -68,6 +73,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   void initState() {
     super.initState();
     _scrollCtrl.addListener(_onScroll);
+    _searchFocus.addListener(_onSearchFocusChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HomeProvider>().loadHome();
     });
@@ -80,11 +86,42 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _searchLogger?.cancel();
     _hintRotator?.cancel();
+    _searchFocus.removeListener(_onSearchFocusChanged);
+    _searchFocus.dispose();
     _searchCtrl.dispose();
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  void _onSearchFocusChanged() {
+    if (_searchFocus.hasFocus && !_historyLoaded) {
+      _historyLoaded = true;
+      ApiService.getSearchHistory().then((list) {
+        if (!mounted) return;
+        setState(() => _searchHistory = list);
+      });
+    }
+    // Trigger a rebuild so the empty-search overlay opens/closes with focus.
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _clearHistory() async {
+    setState(() => _searchHistory = const []);
+    await ApiService.clearSearchHistory();
+  }
+
+  void _useHistoryQuery(String query) {
+    _searchCtrl.text = query;
+    _searchCtrl.selection = TextSelection.fromPosition(
+      TextPosition(offset: query.length),
+    );
+    _searchFocus.unfocus();
+    context.read<HomeProvider>().setSearch(query);
+    // Bump it back to the top of history.
+    ApiService.logSearch(query);
   }
 
   void _onScroll() {
@@ -137,6 +174,29 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       if (!mounted) return;
       context.read<HomeProvider>().setSearch(value.trim());
     });
+    // Log queries the user actually settled on (1.2s after last keystroke
+    // and ≥ 2 chars), so noisy in-progress typing doesn't pollute history.
+    _searchLogger?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.length >= 2) {
+      _searchLogger = Timer(const Duration(milliseconds: 1200), () {
+        ApiService.logSearch(trimmed).then((_) {
+          if (!mounted) return;
+          // Optimistically prepend / hoist to top so the history list is
+          // fresh next time the field is focused, without a refetch.
+          setState(() {
+            final updated = [
+              trimmed,
+              ..._searchHistory.where(
+                (q) => q.toLowerCase() != trimmed.toLowerCase(),
+              ),
+            ];
+            _searchHistory =
+                updated.length > 10 ? updated.sublist(0, 10) : updated;
+          });
+        });
+      });
+    }
   }
 
   @override
@@ -302,6 +362,10 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
               child: _searchBar(),
             ),
           ),
+          if (_searchFocus.hasFocus &&
+              _searchCtrl.text.trim().isEmpty &&
+              _searchHistory.isNotEmpty)
+            SliverToBoxAdapter(child: _recentSearches()),
           const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
           SliverToBoxAdapter(child: _categoryChips(home)),
           if (home.isFiltered)
@@ -326,6 +390,14 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
           children: [
             TextField(
               controller: _searchCtrl,
+              focusNode: _searchFocus,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (v) {
+                final t = v.trim();
+                if (t.isEmpty) return;
+                ApiService.logSearch(t);
+                _searchFocus.unfocus();
+              },
               onChanged: _onSearchChanged,
               style: const TextStyle(
                 fontSize: 14,
@@ -407,6 +479,93 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
           ],
         ),
       );
+
+  Widget _recentSearches() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        0,
+      ),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.borderSoft),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.history_rounded,
+                    size: 16, color: AppColors.inkMuted),
+                const SizedBox(width: 6),
+                const Text(
+                  'Recent searches',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.inkMuted,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Clear search history',
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 18,
+                    color: AppColors.inkFaint,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    _clearHistory();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final q in _searchHistory)
+                  InkWell(
+                    onTap: () => _useHistoryQuery(q),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                        border: Border.all(color: AppColors.borderSoft),
+                      ),
+                      child: Text(
+                        q,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _categoryChips(HomeProvider home) {
     if (home.categories.isEmpty) return const SizedBox.shrink();
