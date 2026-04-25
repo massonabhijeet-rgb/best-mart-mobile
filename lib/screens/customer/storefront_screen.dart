@@ -8,6 +8,9 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../providers/home_provider.dart';
 import '../../providers/shop_status_provider.dart';
+import '../../services/api.dart';
+import '../../services/auth_provider.dart';
+import 'address_picker_screen.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/brand_strip.dart';
 import '../../widgets/cart_preview_sheet.dart';
@@ -407,64 +410,95 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     final picks = pool.take(4).toList();
 
     return SizedBox(
-      height: 64,
+      height: 80,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         children: [
           _CatIconChip(
             label: 'All',
-            icon: '🛒',
+            icon: Icons.apps_rounded,
+            color: AppColors.brandBlue,
             selected: home.categoryId == null,
             onTap: () => home.setCategory(null),
           ),
-          ...picks.map(
-            (c) => _CatIconChip(
+          ...picks.map((c) {
+            final spec = _iconForCategory(c.name);
+            return _CatIconChip(
               label: c.name,
-              icon: _emojiForCategory(c.name),
+              icon: spec.$1,
+              color: spec.$2,
               selected: home.categoryId == c.id,
               onTap: () =>
                   home.setCategory(home.categoryId == c.id ? null : c.id),
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );
   }
 
-  static String _emojiForCategory(String name) {
+  // Icon + accent colour for the top-row category chip. Looked up by
+  // category-name keyword so admins don't have to upload icons; the
+  // tinted circle behind the icon picks up the same colour at low alpha.
+  static (IconData, Color) _iconForCategory(String name) {
     final n = name.toLowerCase();
-    if (n.contains('fruit') || n.contains('veg')) return '🥬';
+    if (n.contains('fruit') || n.contains('veg')) {
+      return (Icons.eco_rounded, const Color(0xFF1A7A44));
+    }
     if (n.contains('dairy') || n.contains('milk') || n.contains('egg')) {
-      return '🥛';
+      return (Icons.local_drink_rounded, const Color(0xFF1976D2));
     }
-    if (n.contains('bread') || n.contains('bakery')) return '🍞';
+    if (n.contains('bread') || n.contains('bakery')) {
+      return (Icons.bakery_dining_rounded, const Color(0xFFC97A1F));
+    }
     if (n.contains('meat') || n.contains('chicken') || n.contains('fish')) {
-      return '🍗';
+      return (Icons.set_meal_rounded, const Color(0xFFB71C1C));
     }
-    if (n.contains('snack') || n.contains('chip')) return '🍿';
+    if (n.contains('snack') || n.contains('chip') || n.contains('namkeen')) {
+      return (Icons.cookie_rounded, const Color(0xFFE07B00));
+    }
     if (n.contains('drink') || n.contains('bever') || n.contains('juice')) {
-      return '🥤';
+      return (Icons.local_cafe_rounded, const Color(0xFF1976D2));
     }
     if (n.contains('choco') || n.contains('sweet') || n.contains('candy')) {
-      return '🍫';
+      return (Icons.cake_rounded, const Color(0xFF6D4C41));
     }
     if (n.contains('personal') || n.contains('care') || n.contains('beauty')) {
-      return '🧴';
+      return (Icons.brush_rounded, const Color(0xFFC2185B));
     }
     if (n.contains('home') || n.contains('clean') || n.contains('house')) {
-      return '🧼';
+      return (Icons.cleaning_services_rounded, const Color(0xFF00838F));
     }
-    if (n.contains('frozen') || n.contains('ice')) return '🧊';
+    if (n.contains('frozen') || n.contains('ice')) {
+      return (Icons.ac_unit_rounded, const Color(0xFF03A9F4));
+    }
     if (n.contains('rice') || n.contains('atta') || n.contains('flour') ||
-        n.contains('grain')) {
-      return '🌾';
+        n.contains('grain') || n.contains('dal')) {
+      return (Icons.grain_rounded, const Color(0xFF8D6E63));
     }
-    if (n.contains('oil') || n.contains('ghee')) return '🫙';
-    if (n.contains('tea') || n.contains('coffee')) return '☕';
-    if (n.contains('baby') || n.contains('kid')) return '🍼';
-    if (n.contains('pet')) return '🐶';
-    return '🛒';
+    if (n.contains('oil') || n.contains('ghee')) {
+      return (Icons.opacity_rounded, const Color(0xFFFFA000));
+    }
+    if (n.contains('tea') || n.contains('coffee')) {
+      return (Icons.coffee_rounded, const Color(0xFF5D4037));
+    }
+    if (n.contains('baby') || n.contains('kid')) {
+      return (Icons.child_care_rounded, const Color(0xFFF06292));
+    }
+    if (n.contains('pet')) {
+      return (Icons.pets_rounded, const Color(0xFF795548));
+    }
+    if (n.contains('summer') || n.contains('cool')) {
+      return (Icons.wb_sunny_rounded, const Color(0xFFFB8C00));
+    }
+    if (n.contains('electronic') || n.contains('appliance')) {
+      return (Icons.headphones_rounded, const Color(0xFF512DA8));
+    }
+    if (n.contains('pharma') || n.contains('health') || n.contains('medic')) {
+      return (Icons.medication_rounded, const Color(0xFF388E3C));
+    }
+    return (Icons.shopping_basket_rounded, AppColors.brandBlue);
   }
 
   String _bestsellerTitle() {
@@ -1090,17 +1124,19 @@ class _RailTheme {
   const _RailTheme({required this.emoji, required this.tint});
 }
 
-/// Icon-on-top chip used in the hero band's top-row. Active item picks
-/// up a bold label + a 2px ink underline; inactive items stay neutral
-/// so the row reads as a department selector rather than a CTA.
+/// Icon-on-top chip used in the hero band's top-row. Each chip carries
+/// its own accent colour — saturated icon over a low-alpha pastel
+/// circle. Active item picks up a 2px ink underline + bold label.
 class _CatIconChip extends StatelessWidget {
   final String label;
-  final String icon;
+  final IconData icon;
+  final Color color;
   final bool selected;
   final VoidCallback onTap;
   const _CatIconChip({
     required this.label,
     required this.icon,
+    required this.color,
     required this.selected,
     required this.onTap,
   });
@@ -1129,15 +1165,24 @@ class _CatIconChip extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(icon, style: const TextStyle(fontSize: 26)),
-              const SizedBox(height: 2),
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(height: 4),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11.5,
                   color: AppColors.ink,
                   fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
                 ),
@@ -1242,8 +1287,86 @@ class _ContextBanner extends StatelessWidget {
   }
 }
 
-class _DeliveryHeader extends StatelessWidget {
+class _DeliveryHeader extends StatefulWidget {
   const _DeliveryHeader();
+
+  @override
+  State<_DeliveryHeader> createState() => _DeliveryHeaderState();
+}
+
+class _DeliveryHeaderState extends State<_DeliveryHeader> {
+  List<SavedAddress> _addresses = [];
+  SavedAddress? _picked;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddresses();
+  }
+
+  Future<void> _loadAddresses() async {
+    if (!context.read<AuthProvider>().isLoggedIn) return;
+    try {
+      final list = await ApiService.getAddresses();
+      if (!mounted) return;
+      setState(() {
+        _addresses = list;
+        // Default to most-used so it lines up with the checkout pre-pick.
+        if (list.isNotEmpty) {
+          _picked = list.reduce((a, b) => a.useCount >= b.useCount ? a : b);
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _openPicker() async {
+    HapticFeedback.selectionClick();
+    final result = await AddressPickerScreen.open(
+      context,
+      savedAddresses: _addresses,
+      selectedSavedAddressId: _picked?.id,
+      initialLatitude: _picked?.latitude,
+      initialLongitude: _picked?.longitude,
+      initialAddressLine: _picked?.deliveryAddress ?? '',
+      initialFullName: _picked?.fullName ?? '',
+      initialPhone: _picked?.phone ?? '',
+      initialNotes: _picked?.deliveryNotes ?? '',
+      fetchCurrentLocationOnOpen: _picked == null,
+    );
+    if (!mounted || result == null) return;
+    // Refresh from server in case the picker added/edited a saved
+    // address. The picker resolves savedAddressId when an existing one
+    // was chosen, so we re-pick by id; otherwise show the picked text.
+    await _loadAddresses();
+    if (!mounted) return;
+    if (result.savedAddressId != null) {
+      final match = _addresses.firstWhere(
+        (a) => a.id == result.savedAddressId,
+        orElse: () => SavedAddress(
+          id: result.savedAddressId!,
+          fullName: result.fullName,
+          phone: result.phone,
+          deliveryAddress: result.addressLine,
+          deliveryNotes: result.deliveryNotes,
+          latitude: result.latitude,
+          longitude: result.longitude,
+          useCount: 0,
+        ),
+      );
+      setState(() => _picked = match);
+    } else {
+      setState(() => _picked = SavedAddress(
+            id: 0,
+            fullName: result.fullName,
+            phone: result.phone,
+            deliveryAddress: result.addressLine,
+            deliveryNotes: result.deliveryNotes,
+            latitude: result.latitude,
+            longitude: result.longitude,
+            useCount: 0,
+          ));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1261,7 +1384,7 @@ class _DeliveryHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'BestMart in',
+              'Delivering in',
               style: TextStyle(
                 color: AppColors.ink,
                 fontWeight: FontWeight.w700,
@@ -1311,37 +1434,49 @@ class _DeliveryHeader extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Text(
-                  'HOME · ',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                    letterSpacing: 0.2,
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _openPicker,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'HOME · ',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      Flexible(
+                        child: Text(
+                          _picked?.deliveryAddress.trim().isNotEmpty == true
+                              ? _picked!.deliveryAddress
+                              : 'Tap to set delivery address',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.inkMuted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: AppColors.inkMuted,
+                      ),
+                    ],
                   ),
                 ),
-                const Flexible(
-                  child: Text(
-                    'Delivering to your doorstep',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AppColors.inkMuted,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 2),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 18,
-                  color: AppColors.inkMuted,
-                ),
-              ],
+              ),
             ),
           ],
         ),

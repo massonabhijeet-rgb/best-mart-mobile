@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
-import '../providers/shop_status_provider.dart';
 import '../screens/customer/cart_provider.dart';
 import '../theme/tokens.dart';
 import 'quick_view_sheet.dart';
@@ -96,11 +95,6 @@ class ProductCard extends StatelessWidget {
                         color: AppColors.brandOrange,
                       ),
                     ),
-                  const Positioned(
-                    bottom: 6,
-                    left: 6,
-                    child: _SpeedChip(),
-                  ),
                   if (lowStock)
                     Positioned(
                       bottom: 6,
@@ -262,39 +256,6 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-class _SpeedChip extends StatelessWidget {
-  const _SpeedChip();
-
-  @override
-  Widget build(BuildContext context) {
-    if (context.watch<ShopStatusProvider>().isClosed) {
-      return const SizedBox.shrink();
-    }
-    return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-        decoration: BoxDecoration(
-          color: AppColors.ink.withValues(alpha: 0.78),
-          borderRadius: BorderRadius.circular(AppRadius.full),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.bolt, color: Colors.white, size: 10),
-            SizedBox(width: 2),
-            Text(
-              '15 min',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ],
-        ),
-      );
-  }
-}
 
 class _ProductImage extends StatelessWidget {
   final String? url;

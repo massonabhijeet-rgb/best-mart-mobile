@@ -289,22 +289,6 @@ class _GridProductCard extends StatelessWidget {
             height: 1.25,
           ),
         ),
-        const SizedBox(height: 4),
-        const Row(
-          children: [
-            Icon(Icons.access_time_rounded,
-                size: 12, color: AppColors.inkFaint),
-            SizedBox(width: 3),
-            Text(
-              '15 mins',
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.inkFaint,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
