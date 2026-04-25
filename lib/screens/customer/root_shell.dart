@@ -64,55 +64,60 @@ class _BottomNav extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        // Floating pill — leaves a margin so content + gradient bg
-        // peek through on the sides.
+        // Floating pill with a hard height so the BackdropFilter has a
+        // bounded surface to blur. Without the SizedBox, extendBody +
+        // BackdropFilter combined to claim half the screen on iOS.
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(40),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.78),
-                borderRadius: BorderRadius.circular(40),
-                border: Border.all(
-                  color: AppColors.borderSoft.withValues(alpha: 0.7),
-                  width: 0.5,
+        child: SizedBox(
+          height: 64,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.surface.withValues(alpha: 0.82),
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(
+                    color: AppColors.borderSoft.withValues(alpha: 0.7),
+                    width: 0.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _NavItem(
-                    label: 'Home',
-                    icon: Icons.home_outlined,
-                    activeIcon: Icons.home_rounded,
-                    selected: active == 0,
-                    onTap: () => onTap(0),
-                  ),
-                  _NavItem(
-                    label: 'Order Again',
-                    icon: Icons.shopping_bag_outlined,
-                    activeIcon: Icons.shopping_bag_rounded,
-                    selected: active == 1,
-                    onTap: () => onTap(1),
-                  ),
-                  _NavItem(
-                    label: 'Categories',
-                    icon: Icons.grid_view_outlined,
-                    activeIcon: Icons.grid_view_rounded,
-                    selected: active == 2,
-                    onTap: () => onTap(2),
-                  ),
-                ],
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _NavItem(
+                      label: 'Home',
+                      icon: Icons.home_outlined,
+                      activeIcon: Icons.home_rounded,
+                      selected: active == 0,
+                      onTap: () => onTap(0),
+                    ),
+                    _NavItem(
+                      label: 'Order Again',
+                      icon: Icons.shopping_bag_outlined,
+                      activeIcon: Icons.shopping_bag_rounded,
+                      selected: active == 1,
+                      onTap: () => onTap(1),
+                    ),
+                    _NavItem(
+                      label: 'Categories',
+                      icon: Icons.grid_view_outlined,
+                      activeIcon: Icons.grid_view_rounded,
+                      selected: active == 2,
+                      onTap: () => onTap(2),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -147,33 +152,33 @@ class _NavItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 3),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.ink.withValues(alpha: 0.06)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(28),
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(32),
+            borderRadius: BorderRadius.circular(28),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
                     selected ? activeIcon : icon,
-                    size: 22,
+                    size: 20,
                     color: color,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     label,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                       color: color,
                     ),
