@@ -198,14 +198,11 @@ class _CategoryTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => OrderAgainCategoryScreen(
-              categoryName: category,
-              products: products,
-            ),
-          ));
-        },
+        onTap: () => OrderAgainCategorySheet.show(
+          context: context,
+          categoryName: category,
+          products: products,
+        ),
         borderRadius: BorderRadius.circular(AppRadius.md),
         child: Container(
           padding: const EdgeInsets.all(8),
