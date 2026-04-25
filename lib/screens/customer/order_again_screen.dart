@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../models/models.dart';
 import '../../services/api.dart';
 import '../../theme/tokens.dart';
-import 'cart_provider.dart';
+import 'order_again_category_screen.dart';
 
-/// Lists every product the user has ordered before, grouped by
-/// category. Each tile is a quick-add tap so they can re-stock without
-/// scrolling the full storefront.
+/// Tile-grid landing showing the categories the user has previously
+/// ordered from. Top categories (by previously-bought-count) surface
+/// under "Frequently bought"; the rest fall into "More that you
+/// ordered". Tapping a tile drills into a per-category list.
 class OrderAgainScreen extends StatefulWidget {
   const OrderAgainScreen({super.key});
 
@@ -20,8 +20,8 @@ class OrderAgainScreen extends StatefulWidget {
 class _OrderAgainScreenState extends State<OrderAgainScreen> {
   bool _loading = true;
   String? _error;
-  // Products the user has bought, deduped by productId, ordered newest-first.
-  List<Product> _products = [];
+  // categoryName → unique products bought, ordered newest-first.
+  Map<String, List<Product>> _byCategory = {};
 
   @override
   void initState() {
@@ -37,33 +37,32 @@ class _OrderAgainScreenState extends State<OrderAgainScreen> {
     try {
       final results = await Future.wait([
         ApiService.getMyOrders(),
-        // Fetch enough catalog to resolve most past purchases. 200 is
-        // generous for a small grocery catalog; large catalogs can
-        // page later.
         ApiService.getProductsPage(page: 1, pageSize: 200),
       ]);
       final orders = results[0] as List<Order>;
       final catalog = (results[1] as ProductPage).products;
       final byId = {for (final p in catalog) p.id: p};
 
-      // Walk orders newest → oldest, dedupe items by productId.
       orders.sort((a, b) => b.createdDate.compareTo(a.createdDate));
       final seen = <int>{};
-      final out = <Product>[];
+      final groups = <String, List<Product>>{};
       for (final o in orders) {
         for (final item in o.items) {
           final pid = item.productId;
           if (pid == null) continue;
           if (seen.contains(pid)) continue;
           final product = byId[pid];
-          if (product == null) continue; // archived / out of catalog
+          if (product == null) continue;
           seen.add(pid);
-          out.add(product);
+          final cat = (product.categoryName?.trim().isNotEmpty == true)
+              ? product.categoryName!
+              : 'Other';
+          groups.putIfAbsent(cat, () => []).add(product);
         }
       }
       if (!mounted) return;
       setState(() {
-        _products = out;
+        _byCategory = groups;
         _loading = false;
       });
     } catch (e) {
@@ -108,13 +107,10 @@ class _OrderAgainScreenState extends State<OrderAgainScreen> {
         icon: Icons.cloud_off_outlined,
         title: 'Could not load orders',
         body: _error!,
-        action: TextButton(
-          onPressed: _load,
-          child: const Text('Try again'),
-        ),
+        action: TextButton(onPressed: _load, child: const Text('Try again')),
       );
     }
-    if (_products.isEmpty) {
+    if (_byCategory.isEmpty) {
       return const _Empty(
         icon: Icons.shopping_basket_outlined,
         title: 'Nothing to re-order yet',
@@ -122,32 +118,31 @@ class _OrderAgainScreenState extends State<OrderAgainScreen> {
       );
     }
 
-    // Group by category name (falls back to "Other" for un-categorised).
-    final groups = <String, List<Product>>{};
-    for (final p in _products) {
-      final cat = (p.categoryName?.trim().isNotEmpty == true)
-          ? p.categoryName!
-          : 'Other';
-      groups.putIfAbsent(cat, () => []).add(p);
-    }
-    final orderedKeys = groups.keys.toList()..sort();
+    // Sort categories by how many distinct products the user has bought
+    // from each — most-bought floats up under "Frequently bought".
+    final entries = _byCategory.entries.toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+    const topN = 5;
+    final top = entries.take(topN).toList();
+    final rest = entries.skip(topN).toList();
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
-      itemCount: orderedKeys.length,
-      itemBuilder: (_, idx) {
-        final cat = orderedKeys[idx];
-        final list = groups[cat]!;
-        return _CategorySection(category: cat, products: list);
-      },
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        if (top.isNotEmpty)
+          _Section(title: 'Frequently bought', entries: top),
+        if (rest.isNotEmpty)
+          _Section(title: 'More that you ordered', entries: rest),
+      ],
     );
   }
 }
 
-class _CategorySection extends StatelessWidget {
-  final String category;
-  final List<Product> products;
-  const _CategorySection({required this.category, required this.products});
+class _Section extends StatelessWidget {
+  final String title;
+  final List<MapEntry<String, List<Product>>> entries;
+  const _Section({required this.title, required this.entries});
 
   @override
   Widget build(BuildContext context) {
@@ -155,184 +150,167 @@ class _CategorySection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: AppColors.ink,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: entries.length,
+            gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 0.86,
+            ),
+            itemBuilder: (_, i) => _CategoryTile(
+              category: entries[i].key,
+              products: entries[i].value,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CategoryTile extends StatelessWidget {
+  final String category;
+  final List<Product> products;
+  const _CategoryTile({required this.category, required this.products});
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = products.take(2).toList();
+    final more = products.length - visible.length;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => OrderAgainCategoryScreen(
+              categoryName: category,
+              products: products,
+            ),
+          ));
+        },
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.sectionSky,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                category,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+              Expanded(
+                child: Stack(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: _MiniProduct(product: visible[0])),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: visible.length > 1
+                              ? _MiniProduct(product: visible[1])
+                              : const SizedBox.shrink(),
+                        ),
+                      ],
+                    ),
+                    if (more > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.full),
+                          ),
+                          child: Text(
+                            '+$more more',
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.brandBlue,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.brandBlue.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(999),
-                ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: Text(
-                  '${products.length}',
+                  category,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.brandBlue,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                    height: 1.2,
                   ),
                 ),
               ),
             ],
           ),
         ),
-        for (final p in products) _ProductRow(product: p),
-      ],
+      ),
     );
   }
 }
 
-class _ProductRow extends StatelessWidget {
+class _MiniProduct extends StatelessWidget {
   final Product product;
-  const _ProductRow({required this.product});
+  const _MiniProduct({required this.product});
 
   @override
   Widget build(BuildContext context) {
-    final cart = context.watch<CartProvider>();
-    final qty = cart.quantity(product.uniqueId);
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: Border.all(color: AppColors.borderSoft),
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: AppRadius.brSm,
-            child: SizedBox(
-              width: 56,
-              height: 56,
-              child: product.imageUrl != null && product.imageUrl!.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: product.imageUrl!,
-                      fit: BoxFit.cover,
-                      memCacheWidth: 180,
-                      memCacheHeight: 180,
-                      placeholder: (_, __) => const ColoredBox(
-                        color: AppColors.surfaceSoft,
-                      ),
-                      errorWidget: (_, __, ___) => const ColoredBox(
-                        color: AppColors.surfaceSoft,
-                        child: Icon(Icons.image_not_supported_outlined,
-                            color: AppColors.inkFaint, size: 24),
-                      ),
-                    )
-                  : Container(
-                      color: AppColors.surfaceSoft,
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.shopping_bag_outlined,
-                        color: AppColors.inkFaint,
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
-                  ),
+      padding: const EdgeInsets.all(6),
+      child: ClipRRect(
+        borderRadius: AppRadius.brSm,
+        child: product.imageUrl != null && product.imageUrl!.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: product.imageUrl!,
+                fit: BoxFit.contain,
+                memCacheWidth: 200,
+                memCacheHeight: 200,
+                placeholder: (_, __) => const SizedBox.shrink(),
+                errorWidget: (_, __, ___) => const Icon(
+                  Icons.shopping_bag_outlined,
+                  color: AppColors.inkFaint,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  product.unitLabel,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.inkFaint,
-                  ),
+              )
+            : const Center(
+                child: Icon(
+                  Icons.shopping_bag_outlined,
+                  color: AppColors.inkFaint,
+                  size: 24,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '₹${(product.priceCents / 100).toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          if (qty == 0)
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.brandBlue,
-                side: const BorderSide(color: AppColors.brandBlue, width: 1.4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                ),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
-                minimumSize: const Size(0, 36),
               ),
-              onPressed: () => cart.add(product),
-              child: const Text(
-                'Add',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-              ),
-            )
-          else
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.brandBlue,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    onPressed: () => cart.remove(product.uniqueId),
-                    icon: const Icon(Icons.remove,
-                        color: Colors.white, size: 16),
-                    constraints:
-                        const BoxConstraints(minWidth: 32, minHeight: 32),
-                    padding: EdgeInsets.zero,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      '$qty',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => cart.add(product),
-                    icon:
-                        const Icon(Icons.add, color: Colors.white, size: 16),
-                    constraints:
-                        const BoxConstraints(minWidth: 32, minHeight: 32),
-                    padding: EdgeInsets.zero,
-                  ),
-                ],
-              ),
-            ),
-        ],
       ),
     );
   }
