@@ -311,65 +311,75 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
           AppSpacing.md,
           AppSpacing.md,
           AppSpacing.md,
-          0,
+          AppSpacing.sm,
         ),
         child: Stack(
           alignment: Alignment.centerLeft,
           children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppRadius.full),
-                boxShadow: AppShadow.soft,
+            TextField(
+              controller: _searchCtrl,
+              onChanged: _onSearchChanged,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.ink,
               ),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: _onSearchChanged,
-                decoration: InputDecoration(
-                  hintText: _searchCtrl.text.isEmpty ? ' ' : null,
-                  prefixIcon:
-                      const Icon(Icons.search, color: AppColors.brandBlue),
-                  suffixIcon: _searchCtrl.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear,
-                              color: AppColors.inkFaint),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            context.read<HomeProvider>().setSearch('');
-                            setState(() {});
-                          },
-                        )
-                      : IconButton(
-                          icon: const Icon(Icons.mic_none_rounded,
-                              color: AppColors.brandBlue),
-                          tooltip: 'Voice search (coming soon)',
-                          onPressed: () {
-                            HapticFeedback.selectionClick();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Voice search coming soon'),
-                                duration: Duration(seconds: 2),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                        ),
-                  filled: true,
-                  fillColor: AppColors.surface.withValues(alpha: 0.92),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    borderSide: const BorderSide(
-                        color: AppColors.brandBlue, width: 1.5),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              decoration: InputDecoration(
+                hintText: _searchCtrl.text.isEmpty ? ' ' : null,
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: AppColors.inkMuted,
+                  size: 22,
                 ),
+                suffixIcon: _searchCtrl.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: AppColors.inkMuted,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          context.read<HomeProvider>().setSearch('');
+                          setState(() {});
+                        },
+                      )
+                    : IconButton(
+                        icon: const Icon(
+                          Icons.mic_none_rounded,
+                          color: AppColors.inkMuted,
+                          size: 20,
+                        ),
+                        tooltip: 'Voice search (coming soon)',
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Voice search coming soon'),
+                              duration: Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                      ),
+                filled: true,
+                fillColor: AppColors.surface,
+                isDense: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  borderSide: BorderSide(color: AppColors.borderSoft),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  borderSide: BorderSide(color: AppColors.borderSoft),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  borderSide: const BorderSide(
+                    color: AppColors.brandBlue,
+                    width: 1.4,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
             if (_searchCtrl.text.isEmpty)
@@ -377,25 +387,11 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
                 left: 48,
                 right: 48,
                 child: IgnorePointer(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 320),
-                    transitionBuilder: (c, a) => FadeTransition(
-                      opacity: a,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, 0.3),
-                          end: Offset.zero,
-                        ).animate(a),
-                        child: c,
-                      ),
-                    ),
-                    child: Text(
-                      _searchHints[_hintIndex],
-                      key: ValueKey(_hintIndex),
-                      style: const TextStyle(
-                        color: AppColors.inkFaint,
-                        fontSize: 14,
-                      ),
+                  child: Text(
+                    _searchHints[_hintIndex],
+                    style: const TextStyle(
+                      color: AppColors.inkFaint,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -846,11 +842,12 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
 }
 
 // Pins the search bar to the top of the scroll viewport once the
-// delivery header + context banner have scrolled past. The persistent
-// surface is a frosted-glass blur so content slides under it cleanly
-// instead of bleeding through a transparent input.
+// delivery header + context banner scroll past. Background is fully
+// transparent at rest (so the bar sits naturally on the gradient) and
+// fades to a solid white surface with a hairline bottom border once
+// pinned — keeps the input readable without piling on shadows or blur.
 class _PinnedSearchBarDelegate extends SliverPersistentHeaderDelegate {
-  static const double _height = 76;
+  static const double _height = 64;
   final Widget child;
   _PinnedSearchBarDelegate({required this.child});
 
@@ -862,21 +859,18 @@ class _PinnedSearchBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     final pinned = shrinkOffset > 0 || overlapsContent;
-    return ClipRect(
-      child: BackdropFilter(
-        filter: pinned
-            ? ImageFilter.blur(sigmaX: 14, sigmaY: 14)
-            : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
-        child: Container(
-          // Subtle tint while floating naturally; firmer translucent
-          // surface once it pins so the input stays readable as products
-          // scroll behind it.
-          color: pinned
-              ? AppColors.surface.withValues(alpha: 0.78)
-              : Colors.transparent,
-          child: SafeArea(top: false, bottom: false, child: child),
-        ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOut,
+      decoration: BoxDecoration(
+        color: pinned ? AppColors.surface : Colors.transparent,
+        border: pinned
+            ? const Border(
+                bottom: BorderSide(color: AppColors.borderSoft, width: 0.5),
+              )
+            : null,
       ),
+      child: child,
     );
   }
 
