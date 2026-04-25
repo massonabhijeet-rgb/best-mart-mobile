@@ -288,7 +288,12 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
         slivers: [
           const SliverToBoxAdapter(child: _DeliveryHeader()),
           const SliverToBoxAdapter(child: _ContextBanner()),
-          SliverToBoxAdapter(child: _searchBar()),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _PinnedSearchBarDelegate(
+              child: _searchBar(),
+            ),
+          ),
           const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
           SliverToBoxAdapter(child: _categoryChips(home)),
           if (home.isFiltered)
@@ -838,6 +843,46 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       ),
     );
   }
+}
+
+// Pins the search bar to the top of the scroll viewport once the
+// delivery header + context banner have scrolled past. The persistent
+// surface is a frosted-glass blur so content slides under it cleanly
+// instead of bleeding through a transparent input.
+class _PinnedSearchBarDelegate extends SliverPersistentHeaderDelegate {
+  static const double _height = 76;
+  final Widget child;
+  _PinnedSearchBarDelegate({required this.child});
+
+  @override
+  double get minExtent => _height;
+  @override
+  double get maxExtent => _height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final pinned = shrinkOffset > 0 || overlapsContent;
+    return ClipRect(
+      child: BackdropFilter(
+        filter: pinned
+            ? ImageFilter.blur(sigmaX: 14, sigmaY: 14)
+            : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+        child: Container(
+          // Subtle tint while floating naturally; firmer translucent
+          // surface once it pins so the input stays readable as products
+          // scroll behind it.
+          color: pinned
+              ? AppColors.surface.withValues(alpha: 0.78)
+              : Colors.transparent,
+          child: SafeArea(top: false, bottom: false, child: child),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _PinnedSearchBarDelegate oldDelegate) =>
+      child != oldDelegate.child;
 }
 
 class _ShopClosedBanner extends StatelessWidget {
