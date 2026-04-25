@@ -453,7 +453,10 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
-            if (_searchCtrl.text.isEmpty)
+            // Hide the rotating placeholder the moment the field gains
+            // focus — once the user has tapped in, the recent-searches
+            // chip strip is the helpful prompt, not the rotating hint.
+            if (_searchCtrl.text.isEmpty && !_searchFocus.hasFocus)
               Positioned(
                 left: 48,
                 right: 48,
