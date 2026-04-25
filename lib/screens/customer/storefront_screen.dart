@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -404,10 +403,41 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
 
   Widget _categoryChips(HomeProvider home) {
     if (home.categories.isEmpty) return const SizedBox.shrink();
-    // Top-level (parent) categories surface here. If none are configured
-    // we fall back to the full flat list so the row never goes empty.
+    // Show a curated set of daily-essential categories instead of the
+    // full catalog. Match against keywords first; whatever's left from
+    // the prioritised list comes from top-level parents (or flat) up
+    // to a max of 6 so the row stays a quick-shortcut bar.
     final tops = home.categories.where((c) => c.parentId == null).toList();
-    final picks = tops.isNotEmpty ? tops : home.categories;
+    final pool = tops.isNotEmpty ? tops : home.categories;
+    final dailyKeywords = [
+      ['fruit', 'veg'],
+      ['dairy', 'milk', 'egg'],
+      ['snack', 'chip', 'namkeen'],
+      ['drink', 'bever', 'juice', 'tea', 'coffee'],
+      ['bread', 'bakery'],
+      ['care', 'beauty', 'personal'],
+    ];
+    final picks = <Category>[];
+    final usedIds = <int>{};
+    for (final group in dailyKeywords) {
+      for (final c in pool) {
+        if (usedIds.contains(c.id)) continue;
+        final n = c.name.toLowerCase();
+        if (group.any(n.contains)) {
+          picks.add(c);
+          usedIds.add(c.id);
+          break;
+        }
+      }
+    }
+    // Top up with whatever's left so users with off-keyword names
+    // still see their categories.
+    for (final c in pool) {
+      if (picks.length >= 6) break;
+      if (usedIds.contains(c.id)) continue;
+      picks.add(c);
+      usedIds.add(c.id);
+    }
 
     return SizedBox(
       height: 80,
@@ -419,21 +449,23 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
             label: 'All',
             icon: Icons.apps_rounded,
             color: AppColors.brandBlue,
+            entryIndex: 0,
             selected: home.categoryId == null,
             onTap: () => home.setCategory(null),
           ),
-          ...picks.map((c) {
-            final spec = _iconForCategory(c.name);
-            return _CatIconChip(
-              label: c.name,
-              icon: spec.$1,
-              color: spec.$2,
-              imageUrl: c.imageUrl,
-              selected: home.categoryId == c.id,
-              onTap: () =>
-                  home.setCategory(home.categoryId == c.id ? null : c.id),
-            );
-          }),
+          for (var i = 0; i < picks.length; i++)
+            _CatIconChip(
+              label: picks[i].name,
+              icon: _iconForCategory(picks[i].name).$1,
+              color: _iconForCategory(picks[i].name).$2,
+              // Stagger by index so the row enters with a soft cascade
+              // from the right edge on every storefront mount.
+              entryIndex: i + 1,
+              selected: home.categoryId == picks[i].id,
+              onTap: () => home.setCategory(
+                home.categoryId == picks[i].id ? null : picks[i].id,
+              ),
+            ),
         ],
       ),
     );
@@ -1125,95 +1157,90 @@ class _RailTheme {
   const _RailTheme({required this.emoji, required this.tint});
 }
 
-/// Icon-on-top chip used in the hero band's top-row. If the category
-/// has an admin-uploaded imageUrl, we render that as the avatar so
-/// the chip shows the *actual* product imagery instead of a generic
-/// keyword-mapped icon. Falls back to a Material icon over a pastel
-/// circle when no image is set.
+/// Icon-on-top chip used in the hero band's top-row. Slides in from
+/// the right with a small per-index stagger when the storefront first
+/// mounts, so the row "wakes up" instead of popping in flat.
 class _CatIconChip extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
-  final String? imageUrl;
+  final int entryIndex;
   final bool selected;
   final VoidCallback onTap;
   const _CatIconChip({
     required this.label,
     required this.icon,
     required this.color,
+    required this.entryIndex,
     required this.selected,
     required this.onTap,
-    this.imageUrl,
   });
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: Container(
-          width: 68,
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: selected ? AppColors.ink : Colors.transparent,
-                width: 2,
+    final delay = Duration(milliseconds: 60 * entryIndex);
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 360) + delay,
+      curve: Curves.easeOutCubic,
+      builder: (context, t, child) {
+        // First (delay/total) of the timeline holds the chip offscreen
+        // to fake a per-index stagger inside a single tween.
+        final delayed = (t - entryIndex * 0.06).clamp(0.0, 1.0);
+        return Opacity(
+          opacity: delayed,
+          child: Transform.translate(
+            offset: Offset(28 * (1 - delayed), 0),
+            child: child,
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: Container(
+            width: 68,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: selected ? AppColors.ink : Colors.transparent,
+                  width: 2,
+                ),
               ),
             ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: hasImage
-                      ? AppColors.surface
-                      : color.withValues(alpha: 0.16),
-                  shape: BoxShape.circle,
-                  border: hasImage
-                      ? Border.all(color: AppColors.borderSoft)
-                      : null,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 24),
                 ),
-                child: hasImage
-                    ? ClipOval(
-                        child: CachedNetworkImage(
-                          imageUrl: imageUrl!,
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          memCacheWidth: 144,
-                          memCacheHeight: 144,
-                          placeholder: (_, __) =>
-                              const SizedBox(width: 48, height: 48),
-                          errorWidget: (_, __, ___) =>
-                              Icon(icon, color: color, size: 24),
-                        ),
-                      )
-                    : Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: AppColors.ink,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.ink,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
