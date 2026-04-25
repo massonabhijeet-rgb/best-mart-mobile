@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -138,12 +139,36 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.pageBg,
+      extendBodyBehindAppBar: true,
       appBar: _appBar(cart),
-      body: Column(
-        children: [
-          if (shop.isClosed) _ShopClosedBanner(message: shop.closedMessage),
-          Expanded(child: _body(home)),
-        ],
+      body: Container(
+        // Soft brand-blue gradient gives the page a sense of depth without
+        // changing the palette; cards float over a tinted surface so the
+        // frosted-glass top bar has something interesting to blur.
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFE1ECFD),
+              Color(0xFFEDF2FF),
+              Color(0xFFF7F9FF),
+            ],
+            stops: [0, 0.35, 1],
+          ),
+        ),
+        // Manually inset for status bar + AppBar height because the
+        // body extends behind the frosted-glass bar.
+        child: Column(
+          children: [
+            SizedBox(
+              height:
+                  MediaQuery.of(context).padding.top + kToolbarHeight,
+            ),
+            if (shop.isClosed) _ShopClosedBanner(message: shop.closedMessage),
+            Expanded(child: _body(home)),
+          ],
+        ),
       ),
       floatingActionButton: _CartFab(cart: cart),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -151,6 +176,26 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   }
 
   PreferredSizeWidget _appBar(CartProvider cart) => AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.62),
+                border: const Border(
+                  bottom: BorderSide(
+                    color: Color(0x14101828),
+                    width: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
         titleSpacing: AppSpacing.md,
         title: Row(
           children: [
@@ -266,54 +311,60 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
         child: Stack(
           alignment: Alignment.centerLeft,
           children: [
-            TextField(
-              controller: _searchCtrl,
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: _searchCtrl.text.isEmpty ? ' ' : null,
-                prefixIcon:
-                    const Icon(Icons.search, color: AppColors.brandBlue),
-                suffixIcon: _searchCtrl.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear,
-                            color: AppColors.inkFaint),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          context.read<HomeProvider>().setSearch('');
-                          setState(() {});
-                        },
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.mic_none_rounded,
-                            color: AppColors.brandBlue),
-                        tooltip: 'Voice search (coming soon)',
-                        onPressed: () {
-                          HapticFeedback.selectionClick();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Voice search coming soon'),
-                              duration: Duration(seconds: 2),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
-                      ),
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: AppRadius.brMd,
-                  borderSide: BorderSide(color: AppColors.borderSoft),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                boxShadow: AppShadow.soft,
+              ),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: _onSearchChanged,
+                decoration: InputDecoration(
+                  hintText: _searchCtrl.text.isEmpty ? ' ' : null,
+                  prefixIcon:
+                      const Icon(Icons.search, color: AppColors.brandBlue),
+                  suffixIcon: _searchCtrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear,
+                              color: AppColors.inkFaint),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            context.read<HomeProvider>().setSearch('');
+                            setState(() {});
+                          },
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.mic_none_rounded,
+                              color: AppColors.brandBlue),
+                          tooltip: 'Voice search (coming soon)',
+                          onPressed: () {
+                            HapticFeedback.selectionClick();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Voice search coming soon'),
+                                duration: Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                        ),
+                  filled: true,
+                  fillColor: AppColors.surface.withValues(alpha: 0.92),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                    borderSide: const BorderSide(
+                        color: AppColors.brandBlue, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: AppRadius.brMd,
-                  borderSide: BorderSide(color: AppColors.borderSoft),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: AppRadius.brMd,
-                  borderSide: const BorderSide(
-                      color: AppColors.brandBlue, width: 1.5),
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
             ),
             if (_searchCtrl.text.isEmpty)
@@ -1046,7 +1097,9 @@ class _CatChip extends StatelessWidget {
                 AppSpacing.sm,
               ),
               decoration: BoxDecoration(
-                color: selected ? AppColors.brandBlue : AppColors.surface,
+                color: selected
+                    ? AppColors.brandBlue
+                    : AppColors.surface.withValues(alpha: 0.92),
                 borderRadius: BorderRadius.circular(AppRadius.full),
                 border: Border.all(
                   color: selected ? AppColors.brandBlue : AppColors.borderSoft,
@@ -1060,7 +1113,7 @@ class _CatChip extends StatelessWidget {
                           offset: const Offset(0, 4),
                         ),
                       ]
-                    : null,
+                    : AppShadow.soft,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1205,59 +1258,78 @@ class _DeliveryHeader extends StatelessWidget {
           AppSpacing.md,
           0,
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.brandBlue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppRadius.full),
-              ),
-              child: const Icon(
-                Icons.bolt,
-                color: AppColors.brandBlue,
-                size: 22,
+            const Text(
+              'Delivery in',
+              style: TextStyle(
+                color: AppColors.inkFaint,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                letterSpacing: 0.3,
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Delivery in 15 minutes',
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                      letterSpacing: -0.1,
-                    ),
+            const SizedBox(height: 2),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text(
+                  '15 minutes',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 26,
+                    letterSpacing: -0.6,
+                    height: 1.1,
                   ),
-                  SizedBox(height: 2),
-                  Row(
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.brandBlue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.location_on_outlined,
-                          size: 12, color: AppColors.inkFaint),
-                      SizedBox(width: 3),
-                      Flexible(
-                        child: Text(
-                          'Home · Delivering to your doorstep',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppColors.inkFaint,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
+                      Icon(Icons.bolt,
+                          size: 13, color: AppColors.brandBlue),
+                      SizedBox(width: 2),
+                      Text(
+                        'Express',
+                        style: TextStyle(
+                          color: AppColors.brandBlue,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Row(
+              children: [
+                Icon(Icons.location_on_outlined,
+                    size: 13, color: AppColors.inkMuted),
+                SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    'Delivering to your doorstep',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.inkMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
