@@ -40,6 +40,11 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   // Recent search chips. Loaded once on first focus + after each clear.
   List<String> _searchHistory = const [];
   bool _historyLoaded = false;
+  // Type-ahead suggestions while the user types. Fetched off the same
+  // /products/page endpoint with pageSize=8 — we just surface the names.
+  List<Product> _suggestions = const [];
+  String _suggestionFor = '';
+  Timer? _suggestionDebounce;
 
   // "More from <category>" cache. Keyed by `<search>|<categoryId>` so we
   // re-fetch when either changes, but never thrash on every grid scroll.
@@ -87,6 +92,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   void dispose() {
     _searchDebounce?.cancel();
     _searchLogger?.cancel();
+    _suggestionDebounce?.cancel();
     _hintRotator?.cancel();
     _searchFocus.removeListener(_onSearchFocusChanged);
     _searchFocus.dispose();
@@ -169,6 +175,31 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   }
 
   void _onSearchChanged(String value) {
+    final trimmed = value.trim();
+    // Type-ahead suggestions on a tighter 180ms debounce — they're a
+    // peek, so latency matters more than the heavier full-grid query
+    // 120ms behind it.
+    _suggestionDebounce?.cancel();
+    if (trimmed.length < 2) {
+      if (_suggestions.isNotEmpty) setState(() => _suggestions = const []);
+    } else {
+      _suggestionDebounce = Timer(const Duration(milliseconds: 180), () async {
+        if (!mounted) return;
+        if (trimmed == _suggestionFor) return;
+        _suggestionFor = trimmed;
+        try {
+          final page = await ApiService.getProductsPage(
+            page: 1,
+            pageSize: 8,
+            search: trimmed,
+          );
+          if (!mounted || _searchCtrl.text.trim() != trimmed) return;
+          setState(() => _suggestions = page.products);
+        } catch (_) {
+          // suggestions are non-critical
+        }
+      });
+    }
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
@@ -177,7 +208,6 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     // Log queries the user actually settled on (1.2s after last keystroke
     // and ≥ 2 chars), so noisy in-progress typing doesn't pollute history.
     _searchLogger?.cancel();
-    final trimmed = value.trim();
     if (trimmed.length >= 2) {
       _searchLogger = Timer(const Duration(milliseconds: 1200), () {
         ApiService.logSearch(trimmed).then((_) {
@@ -366,6 +396,10 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
               _searchCtrl.text.trim().isEmpty &&
               _searchHistory.isNotEmpty)
             SliverToBoxAdapter(child: _recentSearches()),
+          if (_searchFocus.hasFocus &&
+              _searchCtrl.text.trim().isNotEmpty &&
+              _suggestions.isNotEmpty)
+            SliverToBoxAdapter(child: _suggestionList()),
           const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
           SliverToBoxAdapter(child: _categoryChips(home)),
           if (home.isFiltered)
@@ -479,6 +513,100 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
           ],
         ),
       );
+
+  Widget _suggestionList() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        0,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < _suggestions.length; i++)
+            InkWell(
+              onTap: () => _useSuggestion(_suggestions[i]),
+              borderRadius: BorderRadius.vertical(
+                top: i == 0 ? const Radius.circular(AppRadius.md) : Radius.zero,
+                bottom: i == _suggestions.length - 1
+                    ? const Radius.circular(AppRadius.md)
+                    : Radius.zero,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: _suggestions[i].imageUrl != null &&
+                              _suggestions[i].imageUrl!.isNotEmpty
+                          ? Image.network(
+                              _suggestions[i].imageUrl!,
+                              fit: BoxFit.contain,
+                              cacheWidth: 108,
+                              errorBuilder: (_, _e, _s) => const Icon(
+                                Icons.shopping_bag_outlined,
+                                color: AppColors.inkFaint,
+                                size: 18,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.shopping_bag_outlined,
+                              color: AppColors.inkFaint,
+                              size: 18,
+                            ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _suggestions[i].name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.north_west_rounded,
+                      size: 16,
+                      color: AppColors.inkFaint,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _useSuggestion(Product p) {
+    HapticFeedback.selectionClick();
+    final q = p.name;
+    _searchCtrl.text = q;
+    _searchCtrl.selection =
+        TextSelection.fromPosition(TextPosition(offset: q.length));
+    _searchFocus.unfocus();
+    setState(() => _suggestions = const []);
+    context.read<HomeProvider>().setSearch(q);
+    ApiService.logSearch(q);
+  }
 
   Widget _recentSearches() {
     return Padding(
