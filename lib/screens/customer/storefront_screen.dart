@@ -173,6 +173,12 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
 
   void _onSearchChanged(String value) {
     final trimmed = value.trim();
+    // Rebuild every keystroke so the placeholder overlay and the
+    // mic/close suffix icon swap update immediately. Without this the
+    // surrounding Stack only rebuilds once the suggestion debounce
+    // fires (~180ms later), leaving the hint visible behind the
+    // typed text.
+    setState(() {});
     // Type-ahead suggestions on a tighter 180ms debounce — they're a
     // peek, so latency matters more than the heavier full-grid query
     // 120ms behind it.
