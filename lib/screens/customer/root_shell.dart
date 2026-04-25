@@ -67,17 +67,17 @@ class _BottomNav extends StatelessWidget {
         // Floating pill with a hard height so the BackdropFilter has a
         // bounded surface to blur. Without the SizedBox, extendBody +
         // BackdropFilter combined to claim half the screen on iOS.
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
         child: SizedBox(
-          height: 64,
+          height: 54,
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(32),
+            borderRadius: BorderRadius.circular(28),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColors.surface.withValues(alpha: 0.82),
-                  borderRadius: BorderRadius.circular(32),
+                  borderRadius: BorderRadius.circular(28),
                   border: Border.all(
                     color: AppColors.borderSoft.withValues(alpha: 0.7),
                     width: 0.5,
@@ -91,7 +91,7 @@ class _BottomNav extends StatelessWidget {
                   ],
                 ),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -165,20 +165,20 @@ class _NavItem extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(28),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: 2),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
                     selected ? activeIcon : icon,
-                    size: 20,
+                    size: 19,
                     color: color,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text(
                     label,
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 10,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                       color: color,
                     ),
