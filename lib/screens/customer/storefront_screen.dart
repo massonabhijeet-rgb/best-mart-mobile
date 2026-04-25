@@ -13,13 +13,11 @@ import '../../services/auth_provider.dart';
 import 'address_picker_screen.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/brand_strip.dart';
-import '../../widgets/cart_preview_sheet.dart';
 import '../../widgets/category_tiles_grid.dart';
 import '../../widgets/home_rail.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/section_background.dart';
 import '../../widgets/skeleton.dart';
-import 'cart_provider.dart';
 import 'profile_screen.dart';
 
 class StorefrontScreen extends StatefulWidget {
@@ -230,7 +228,6 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cart = context.watch<CartProvider>();
     final home = context.watch<HomeProvider>();
     final shop = context.watch<ShopStatusProvider>();
 
@@ -270,8 +267,6 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
           ],
         ),
       ),
-      floatingActionButton: _CartFab(cart: cart),
-      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
 
@@ -1388,132 +1383,6 @@ class _ProfileAvatarButton extends StatelessWidget {
                       height: 1,
                     ),
                   ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CartFab extends StatelessWidget {
-  final CartProvider cart;
-  const _CartFab({required this.cart});
-
-  @override
-  Widget build(BuildContext context) {
-    final visible = cart.totalItems > 0;
-    return AnimatedSlide(
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-      offset: visible ? Offset.zero : const Offset(0, 2),
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 220),
-        opacity: visible ? 1 : 0,
-        child: IgnorePointer(
-          ignoring: !visible,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(AppRadius.full),
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  CartPreviewSheet.show(context);
-                },
-                child: Ink(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.brandBlue, AppColors.brandBlueDark],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.brandBlue.withValues(alpha: 0.45),
-                        blurRadius: 18,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                              width: 32,
-                              height: 32,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.22),
-                                borderRadius:
-                                    BorderRadius.circular(AppRadius.full),
-                              ),
-                              child: const Icon(
-                                Icons.shopping_bag_rounded,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                            Positioned(
-                              right: -2,
-                              top: -2,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 180),
-                                transitionBuilder: (c, a) =>
-                                    ScaleTransition(scale: a, child: c),
-                                child: Container(
-                                  key: ValueKey(cart.totalItems),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 4, vertical: 1),
-                                  constraints: const BoxConstraints(
-                                      minWidth: 15, minHeight: 15),
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.brandOrange,
-                                    borderRadius: BorderRadius.circular(
-                                        AppRadius.full),
-                                    border: Border.all(
-                                        color: Colors.white, width: 1.2),
-                                  ),
-                                  child: Text(
-                                    '${cart.totalItems}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 8),
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          child: Text(
-                            '₹${(cart.subtotalCents / 100).toStringAsFixed(0)}',
-                            key: ValueKey(cart.subtotalCents),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ),
         ),
       ),

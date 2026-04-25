@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/home_provider.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/cart_fab.dart';
 import 'categories_screen.dart';
 import 'order_again_screen.dart';
 import 'storefront_screen.dart';
@@ -49,7 +50,22 @@ class _RootShellState extends State<RootShell> {
           CategoriesScreen(onCategoryTap: _openCategoryOnHome),
         ],
       ),
-      bottomNavigationBar: _BottomNav(active: _index, onTap: _go),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Cart pill stacks ABOVE the nav so it never collides with the
+          // floating Home/Order Again/Categories tabs.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md, 0, AppSpacing.md, 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: const CartFab(),
+            ),
+          ),
+          _BottomNav(active: _index, onTap: _go),
+        ],
+      ),
     );
   }
 }
