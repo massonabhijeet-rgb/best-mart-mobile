@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/models.dart';
 import '../../services/api.dart';
@@ -8,6 +11,16 @@ class CartItem {
   final Product product;
   int quantity;
   CartItem({required this.product, this.quantity = 1});
+
+  Map<String, dynamic> toJson() => {
+        'product': product.toJson(),
+        'quantity': quantity,
+      };
+
+  factory CartItem.fromJson(Map<String, dynamic> j) => CartItem(
+        product: Product.fromJson(j['product'] as Map<String, dynamic>),
+        quantity: j['quantity'] as int,
+      );
 }
 
 class CartProvider extends ChangeNotifier {
@@ -16,10 +29,16 @@ class CartProvider extends ChangeNotifier {
   static const int promoThresholdCents = 50000;
   static const int promoMaxCents = 20000;
 
+  static const String _storageKey = 'cart_items_v1';
+
   final Map<String, CartItem> _items = {};
   CouponPreview? _appliedCoupon;
   String _couponError = '';
   bool _applyingCoupon = false;
+
+  CartProvider() {
+    _load();
+  }
 
   Map<String, CartItem> get items => _items;
 
@@ -65,6 +84,7 @@ class CartProvider extends ChangeNotifier {
       _items[p.uniqueId] = CartItem(product: p);
     }
     notifyListeners();
+    _save();
     _revalidateCoupon();
   }
 
@@ -76,6 +96,7 @@ class CartProvider extends ChangeNotifier {
       _items.remove(uniqueId);
     }
     notifyListeners();
+    _save();
     _revalidateCoupon();
   }
 
@@ -84,6 +105,37 @@ class CartProvider extends ChangeNotifier {
     _appliedCoupon = null;
     _couponError = '';
     notifyListeners();
+    _save();
+  }
+
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_storageKey);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      _items.clear();
+      decoded.forEach((key, value) {
+        _items[key] = CartItem.fromJson(value as Map<String, dynamic>);
+      });
+      notifyListeners();
+    } catch (_) {
+      // ignore: corrupt or incompatible payload — start fresh
+    }
+  }
+
+  Future<void> _save() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_items.isEmpty) {
+        await prefs.remove(_storageKey);
+        return;
+      }
+      final encoded = jsonEncode(
+        _items.map((k, v) => MapEntry(k, v.toJson())),
+      );
+      await prefs.setString(_storageKey, encoded);
+    } catch (_) {}
   }
 
   Future<bool> applyCoupon(String code) async {

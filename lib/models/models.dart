@@ -243,6 +243,22 @@ class Product {
         badge: j['badge'],
         categoryName: j['categoryName'],
       );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'uniqueId': uniqueId,
+        'name': name,
+        'unitLabel': unitLabel,
+        'description': description,
+        'priceCents': priceCents,
+        'originalPriceCents': originalPriceCents,
+        'stockQuantity': stockQuantity,
+        'isActive': isActive,
+        'isOnOffer': isOnOffer,
+        'imageUrl': imageUrl,
+        'badge': badge,
+        'categoryName': categoryName,
+      };
 }
 
 class Category {
