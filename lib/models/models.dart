@@ -213,6 +213,7 @@ class Product {
   final bool isOnOffer;
   final String? imageUrl;
   final String? badge;
+  final int? categoryId;
   final String? categoryName;
 
   Product({
@@ -228,6 +229,7 @@ class Product {
     required this.isOnOffer,
     this.imageUrl,
     this.badge,
+    this.categoryId,
     this.categoryName,
   });
 
@@ -244,6 +246,7 @@ class Product {
         isOnOffer: j['isOnOffer'] ?? false,
         imageUrl: j['imageUrl'],
         badge: j['badge'],
+        categoryId: (j['categoryId'] as num?)?.toInt(),
         categoryName: j['categoryName'],
       );
 

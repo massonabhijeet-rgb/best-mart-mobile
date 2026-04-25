@@ -36,6 +36,13 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   Timer? _hintRotator;
   int _hintIndex = 0;
 
+  // "More from <category>" cache. Keyed by `<search>|<categoryId>` so we
+  // re-fetch when either changes, but never thrash on every grid scroll.
+  String? _relatedSig;
+  bool _loadingRelated = false;
+  String? _relatedCategoryName;
+  List<Product> _relatedProducts = const [];
+
   // Popup overlay is shown at most once per app session.
   static bool _campaignShownThisSession = false;
   int? _lastCampaignSeenId;
@@ -775,7 +782,72 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     }
   }
 
+  // Picks the most-common categoryId out of the search hits, then
+  // (once per <search,category> pair) fetches more products from that
+  // same category so the page has somewhere to go after the exact
+  // matches end. Searching "coke" → shown Coca-Cola hits + Pepsi /
+  // Campa / 7Up etc. under "More from Cold Drinks".
+  void _maybeLoadRelatedFromSearch(HomeProvider home) {
+    if (home.search.isEmpty) {
+      if (_relatedProducts.isNotEmpty || _relatedSig != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _relatedProducts = const [];
+            _relatedCategoryName = null;
+            _relatedSig = null;
+          });
+        });
+      }
+      return;
+    }
+    if (!home.firstGridLoaded || home.gridProducts.isEmpty) return;
+    if (_loadingRelated) return;
+
+    final counts = <int, int>{};
+    final names = <int, String>{};
+    for (final p in home.gridProducts) {
+      final cid = p.categoryId;
+      if (cid == null) continue;
+      counts[cid] = (counts[cid] ?? 0) + 1;
+      if (p.categoryName != null && p.categoryName!.isNotEmpty) {
+        names[cid] = p.categoryName!;
+      }
+    }
+    if (counts.isEmpty) return;
+    final top = counts.entries.reduce((a, b) => a.value >= b.value ? a : b);
+    final catId = top.key;
+    final catName = names[catId] ?? '';
+    final sig = '${home.search}|$catId';
+    if (_relatedSig == sig) return;
+
+    _relatedSig = sig;
+    _loadingRelated = true;
+    final shownIds = home.gridProducts.map((p) => p.id).toSet();
+    ApiService.getProductsPage(page: 1, pageSize: 30, categoryId: catId)
+        .then((page) {
+      if (!mounted) return;
+      setState(() {
+        _relatedCategoryName = catName;
+        _relatedProducts = page.products
+            .where((p) => !shownIds.contains(p.id))
+            .take(20)
+            .toList();
+        _loadingRelated = false;
+      });
+    }).catchError((_) {
+      if (!mounted) return;
+      setState(() => _loadingRelated = false);
+    });
+  }
+
   List<Widget> _buildFilteredSlivers(HomeProvider home, BuildContext context) {
+    // Schedule the related-products fetch outside this build pass so we
+    // don't setState during a build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _maybeLoadRelatedFromSearch(home);
+    });
     if (!home.firstGridLoaded && home.gridProducts.isEmpty) {
       return [_skeletonGrid()];
     }
@@ -823,15 +895,50 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       if (!home.hasMore && home.gridProducts.isNotEmpty)
         const SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
             child: Center(
               child: Text(
-                "You've reached the end.",
+                "You've reached the end of these matches.",
                 style: TextStyle(color: AppColors.inkFaint, fontSize: 12),
               ),
             ),
           ),
         ),
+      if (_relatedProducts.isNotEmpty &&
+          home.search.isNotEmpty &&
+          home.firstGridLoaded)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.recommend_rounded,
+                    size: 18, color: AppColors.brandBlue),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'More from ${_relatedCategoryName ?? "this category"}',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.ink,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      if (_relatedProducts.isNotEmpty &&
+          home.search.isNotEmpty &&
+          home.firstGridLoaded)
+        _productGrid(_relatedProducts),
     ];
   }
 
