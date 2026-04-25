@@ -199,18 +199,15 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
         titleSpacing: AppSpacing.md,
         title: Row(
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.brandBlue.withValues(alpha: 0.1),
-                borderRadius: AppRadius.brSm,
-              ),
-              child: const Icon(
-                Icons.shopping_basket_rounded,
-                color: AppColors.brandBlue,
-                size: 18,
+            ClipRRect(
+              borderRadius: AppRadius.brSm,
+              child: Image.asset(
+                'assets/icon/app_icon.png',
+                width: 32,
+                height: 32,
+                cacheWidth: 96,
+                cacheHeight: 96,
+                fit: BoxFit.cover,
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
