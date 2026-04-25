@@ -50,21 +50,19 @@ class _RootShellState extends State<RootShell> {
           CategoriesScreen(onCategoryTap: _openCategoryOnHome),
         ],
       ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Cart pill stacks ABOVE the nav so it never collides with the
-          // floating Home/Order Again/Categories tabs.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md, 0, AppSpacing.md, 6),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: const CartFab(),
-            ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: _BottomNav(active: _index, onTap: _go)),
+              const SizedBox(width: 10),
+              const CartFab(),
+            ],
           ),
-          _BottomNav(active: _index, onTap: _go),
-        ],
+        ),
       ),
     );
   }
@@ -77,64 +75,55 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        // Floating pill with a hard height so the BackdropFilter has a
-        // bounded surface to blur. Without the SizedBox, extendBody +
-        // BackdropFilter combined to claim half the screen on iOS.
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-        child: SizedBox(
-          height: 48,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface.withValues(alpha: 0.82),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: AppColors.borderSoft.withValues(alpha: 0.7),
-                    width: 0.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 18,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _NavItem(
-                      label: 'Home',
-                      icon: Icons.home_outlined,
-                      activeIcon: Icons.home_rounded,
-                      selected: active == 0,
-                      onTap: () => onTap(0),
-                    ),
-                    _NavItem(
-                      label: 'Order Again',
-                      icon: Icons.shopping_bag_outlined,
-                      activeIcon: Icons.shopping_bag_rounded,
-                      selected: active == 1,
-                      onTap: () => onTap(1),
-                    ),
-                    _NavItem(
-                      label: 'Categories',
-                      icon: Icons.grid_view_outlined,
-                      activeIcon: Icons.grid_view_rounded,
-                      selected: active == 2,
-                      onTap: () => onTap(2),
-                    ),
-                  ],
-                ),
+    // Hard height so the BackdropFilter has a bounded surface to blur.
+    return SizedBox(
+      height: 52,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: AppColors.borderSoft.withValues(alpha: 0.7),
+                width: 0.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _NavItem(
+                  label: 'Home',
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home_rounded,
+                  selected: active == 0,
+                  onTap: () => onTap(0),
+                ),
+                _NavItem(
+                  label: 'Order Again',
+                  icon: Icons.shopping_bag_outlined,
+                  activeIcon: Icons.shopping_bag_rounded,
+                  selected: active == 1,
+                  onTap: () => onTap(1),
+                ),
+                _NavItem(
+                  label: 'Categories',
+                  icon: Icons.grid_view_outlined,
+                  activeIcon: Icons.grid_view_rounded,
+                  selected: active == 2,
+                  onTap: () => onTap(2),
+                ),
+              ],
             ),
           ),
         ),
@@ -160,20 +149,29 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // No accent colour — active vs inactive shows via icon fill swap,
-    // text weight, and a translucent gray highlight pill behind the
-    // selected tab.
-    final color = selected ? AppColors.ink : AppColors.inkFaint;
+    // Selected tab: a brighter white pill behind a colored icon, bolded
+    // label. Mirrors the Blinkit-style nav reference.
+    final iconColor =
+        selected ? AppColors.brandOrange : AppColors.inkFaint;
+    final labelColor = selected ? AppColors.ink : AppColors.inkFaint;
     return Expanded(
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        margin: const EdgeInsets.symmetric(horizontal: 3),
+        margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.ink.withValues(alpha: 0.06)
-              : Colors.transparent,
+          color:
+              selected ? Colors.white.withValues(alpha: 0.95) : Colors.transparent,
           borderRadius: BorderRadius.circular(28),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Material(
           color: Colors.transparent,
@@ -187,16 +185,17 @@ class _NavItem extends StatelessWidget {
                 children: [
                   Icon(
                     selected ? activeIcon : icon,
-                    size: 16,
-                    color: color,
+                    size: 18,
+                    color: iconColor,
                   ),
                   const SizedBox(height: 1),
                   Text(
                     label,
                     style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      color: color,
+                      fontSize: 10,
+                      fontWeight:
+                          selected ? FontWeight.w800 : FontWeight.w500,
+                      color: labelColor,
                     ),
                   ),
                 ],
