@@ -78,21 +78,26 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   }
 
   /// Builds the rider + destination map pins. The rider uses a
-  /// custom PNG asset (assets/icon/rider_icon.png) downsized to a
-  /// pin-friendly size; the destination is Canvas-drawn so we
-  /// don't need a second asset for it. Built once on mount and
-  /// cached so location updates don't re-create the bitmap.
+  /// custom PNG asset (assets/icon/rider_icon.png); the destination
+  /// is Canvas-drawn. Built once on mount and cached so location
+  /// updates don't re-create the bitmap.
   Future<void> _buildCustomMarkers() async {
+    // Multiply the visual size by devicePixelRatio so the bitmap
+    // we hand to Google Maps has enough physical pixels to render
+    // crisply on 2x / 3x density screens. Without this, an 86-px
+    // source bitmap stretches to 258 physical px on a 3x phone and
+    // looks pixelated. View.of(context) is safe in initState
+    // (doesn't subscribe to layout changes the way MediaQuery does).
+    final dpr = View.of(context).devicePixelRatio;
     final rider = await _bitmapFromAsset(
       'assets/icon/rider_icon.png',
-      targetSize: 86, // logical pixels — kept small so the pin
-                     //   doesn't dominate the 220-tall map area.
+      targetSize: (90 * dpr).round(),
     );
     final destination = await _circleIconMarker(
       icon: Icons.home_rounded,
       ringColor: AppColors.danger,
       iconColor: AppColors.danger,
-      size: 84,
+      size: 84 * dpr,
     );
     if (!mounted) return;
     setState(() {
@@ -101,10 +106,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     });
   }
 
-  /// Loads a PNG asset, resizes it to `targetSize`, and returns it
-  /// as a BitmapDescriptor. Uses `instantiateImageCodec` with target
-  /// dimensions so a high-res source PNG (e.g. 1024×1024) doesn't
-  /// render as a giant pin on the map.
+  /// Loads a PNG asset, decodes at the requested pixel size, and
+  /// returns it as a BitmapDescriptor. The size is in PHYSICAL
+  /// pixels (already multiplied by devicePixelRatio by the caller),
+  /// so the resulting marker stays crisp on 2x / 3x screens.
   Future<BitmapDescriptor> _bitmapFromAsset(
     String assetPath, {
     required int targetSize,
