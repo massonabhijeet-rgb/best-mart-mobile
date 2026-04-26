@@ -2220,7 +2220,8 @@ class _DeliveryHeaderState extends State<_DeliveryHeader>
             ),
           ],
         ),
-      );
+      ),
+    );
   }
 }
 
