@@ -19,6 +19,7 @@ import '../../widgets/product_card.dart';
 import '../../widgets/section_background.dart';
 import '../../widgets/skeleton.dart';
 import 'profile_screen.dart';
+import 'themed_page_screen.dart';
 
 class StorefrontScreen extends StatefulWidget {
   const StorefrontScreen({super.key});
@@ -693,6 +694,11 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       usedIds.add(c.id);
     }
 
+    // Themed-page chips ride alongside category chips in the same row,
+    // sandwiched between "All" and the daily-essentials. They never look
+    // "selected" (tapping them navigates instead of toggling a filter
+    // on the home grid).
+    final themed = home.themedPages;
     return SizedBox(
       height: 80,
       child: ListView(
@@ -707,6 +713,20 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
             selected: home.categoryId == null,
             onTap: () => home.setCategory(null),
           ),
+          for (var i = 0; i < themed.length; i++)
+            _CatIconChip(
+              label: themed[i].title,
+              icon: Icons.auto_awesome_rounded,
+              color: AppColors.brandOrange,
+              imageUrl: themed[i].navIconUrl,
+              entryIndex: i + 1,
+              selected: false,
+              onTap: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => ThemedPageScreen(page: themed[i]),
+                ));
+              },
+            ),
           for (var i = 0; i < picks.length; i++)
             _CatIconChip(
               label: picks[i].name,
@@ -714,7 +734,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
               color: _iconForCategory(picks[i].name).$2,
               // Stagger by index so the row enters with a soft cascade
               // from the right edge on every storefront mount.
-              entryIndex: i + 1,
+              entryIndex: i + 1 + themed.length,
               selected: home.categoryId == picks[i].id,
               onTap: () => home.setCategory(
                 home.categoryId == picks[i].id ? null : picks[i].id,
@@ -1432,6 +1452,9 @@ class _CatIconChip extends StatelessWidget {
   final int entryIndex;
   final bool selected;
   final VoidCallback onTap;
+  /// When set, the chip renders this network image instead of the
+  /// icon — used for admin-uploaded themed-page nav icons.
+  final String? imageUrl;
   const _CatIconChip({
     required this.label,
     required this.icon,
@@ -1439,6 +1462,7 @@ class _CatIconChip extends StatelessWidget {
     required this.entryIndex,
     required this.selected,
     required this.onTap,
+    this.imageUrl,
   });
 
   @override
@@ -1490,7 +1514,19 @@ class _CatIconChip extends StatelessWidget {
                     color: color.withValues(alpha: 0.16),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(icon, color: color, size: 24),
+                  clipBehavior: imageUrl != null && imageUrl!.isNotEmpty
+                      ? Clip.antiAlias
+                      : Clip.none,
+                  child: imageUrl != null && imageUrl!.isNotEmpty
+                      ? Image.network(
+                          imageUrl!,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              Icon(icon, color: color, size: 24),
+                        )
+                      : Icon(icon, color: color, size: 24),
                 ),
                 const SizedBox(height: 4),
                 Text(

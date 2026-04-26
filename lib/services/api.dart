@@ -163,6 +163,22 @@ class ApiService {
     return (data['categories'] as List).map((c) => Category.fromJson(c)).toList();
   }
 
+  // Themed seasonal landing pages — admin-authored hero + tile grid
+  // surfaces. Returned list is already filtered server-side to only
+  // active, in-window pages, sorted by sortOrder.
+  static Future<List<ThemedPage>> getThemedPages() async {
+    try {
+      final data = await _req('GET', '/themed-pages');
+      return ((data['themedPages'] ?? []) as List)
+          .map((p) => ThemedPage.fromJson(p as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      // Non-critical surface — never let a themed-pages outage block
+      // the home page from rendering.
+      return const [];
+    }
+  }
+
   static Future<List<TempCategory>> getTempCategories({String? mood}) async {
     final qs = (mood != null && mood.isNotEmpty)
         ? '?mood=${Uri.encodeComponent(mood)}'

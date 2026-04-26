@@ -15,6 +15,7 @@ class HomeProvider extends ChangeNotifier {
   List<TempCategory> _tempCategories = [];
   List<Brand> _brands = [];
   Campaign? _activeCampaign;
+  List<ThemedPage> _themedPages = const [];
 
   String _search = '';
   int? _categoryId;
@@ -36,6 +37,7 @@ class HomeProvider extends ChangeNotifier {
   List<TempCategory> get tempCategories => _tempCategories;
   List<Brand> get brands => _brands;
   Campaign? get activeCampaign => _activeCampaign;
+  List<ThemedPage> get themedPages => _themedPages;
   void consumeActiveCampaign() {
     if (_activeCampaign == null) return;
     _activeCampaign = null;
@@ -70,6 +72,7 @@ class HomeProvider extends ChangeNotifier {
         ApiService.getTempCategories().catchError((_) => <TempCategory>[]),
         ApiService.getBrands().catchError((_) => <Brand>[]),
         ApiService.getActiveCampaign().catchError((_) => null),
+        ApiService.getThemedPages(),
       ]);
       final rawRails = results[0] as HomeRails;
       _rails = HomeRails(
@@ -82,6 +85,9 @@ class HomeProvider extends ChangeNotifier {
                   products: _sortedByStock(r.products),
                 ))
             .toList(),
+        // Preserve the personalised "Picked for you" rail — earlier
+        // re-wrap dropped this field, hiding the rail from the UI.
+        pickedForYou: _sortedByStock(rawRails.pickedForYou),
       );
       _categories = results[1] as List<Category>;
       _coupons = results[2] as List<Coupon>;
@@ -104,6 +110,7 @@ class HomeProvider extends ChangeNotifier {
           .toList();
       _brands = results[5] as List<Brand>;
       _activeCampaign = results[6] as Campaign?;
+      _themedPages = results[7] as List<ThemedPage>;
       _state = LoadState.ready;
       notifyListeners();
       await _resetGrid();

@@ -625,3 +625,109 @@ class ShopStatus {
                 "We're closed right now. Come back tomorrow!",
       );
 }
+
+// ─── Themed pages ────────────────────────────────────────────────────────
+//
+// Editorial seasonal landing pages — each surfaces as a tab in the
+// storefront's top icon row and opens a dedicated screen with a hero
+// banner + tile grid. Tiles deep-link into a category, a search query,
+// or a hand-curated set of product ids.
+
+enum ThemedPageTileLinkType { category, search, productIds, unknown }
+
+ThemedPageTileLinkType _parseTileLinkType(String? raw) {
+  switch (raw) {
+    case 'category':
+      return ThemedPageTileLinkType.category;
+    case 'search':
+      return ThemedPageTileLinkType.search;
+    case 'product_ids':
+      return ThemedPageTileLinkType.productIds;
+    default:
+      return ThemedPageTileLinkType.unknown;
+  }
+}
+
+class ThemedPageTile {
+  final int id;
+  final String label;
+  final String? sublabel;
+  final String? imageUrl;
+  final String? bgColor;
+  final ThemedPageTileLinkType linkType;
+  final int? linkCategoryId;
+  final String? linkSearchQuery;
+  final List<int>? linkProductIds;
+  final int sortOrder;
+
+  const ThemedPageTile({
+    required this.id,
+    required this.label,
+    required this.sublabel,
+    required this.imageUrl,
+    required this.bgColor,
+    required this.linkType,
+    required this.linkCategoryId,
+    required this.linkSearchQuery,
+    required this.linkProductIds,
+    required this.sortOrder,
+  });
+
+  factory ThemedPageTile.fromJson(Map<String, dynamic> j) {
+    final ids = j['linkProductIds'];
+    return ThemedPageTile(
+      id: j['id'] ?? 0,
+      label: j['label'] ?? '',
+      sublabel: j['sublabel'] as String?,
+      imageUrl: j['imageUrl'] as String?,
+      bgColor: j['bgColor'] as String?,
+      linkType: _parseTileLinkType(j['linkType'] as String?),
+      linkCategoryId: j['linkCategoryId'] as int?,
+      linkSearchQuery: j['linkSearchQuery'] as String?,
+      linkProductIds:
+          ids is List ? ids.map((e) => (e as num).toInt()).toList() : null,
+      sortOrder: j['sortOrder'] ?? 0,
+    );
+  }
+}
+
+class ThemedPage {
+  final int id;
+  final String slug;
+  final String title;
+  final String? subtitle;
+  final String? navIconUrl;
+  final String? heroImageUrl;
+  final String? themeColor;
+  final bool isActive;
+  final int sortOrder;
+  final List<ThemedPageTile> tiles;
+
+  const ThemedPage({
+    required this.id,
+    required this.slug,
+    required this.title,
+    required this.subtitle,
+    required this.navIconUrl,
+    required this.heroImageUrl,
+    required this.themeColor,
+    required this.isActive,
+    required this.sortOrder,
+    required this.tiles,
+  });
+
+  factory ThemedPage.fromJson(Map<String, dynamic> j) => ThemedPage(
+        id: j['id'] ?? 0,
+        slug: j['slug'] ?? '',
+        title: j['title'] ?? '',
+        subtitle: j['subtitle'] as String?,
+        navIconUrl: j['navIconUrl'] as String?,
+        heroImageUrl: j['heroImageUrl'] as String?,
+        themeColor: j['themeColor'] as String?,
+        isActive: (j['isActive'] as bool?) ?? true,
+        sortOrder: j['sortOrder'] ?? 0,
+        tiles: ((j['tiles'] ?? []) as List)
+            .map((t) => ThemedPageTile.fromJson(t as Map<String, dynamic>))
+            .toList(),
+      );
+}
