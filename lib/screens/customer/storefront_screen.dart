@@ -1699,7 +1699,11 @@ class _ThemedTileCard extends StatelessWidget {
             color: bg,
             borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
-          padding: const EdgeInsets.all(AppSpacing.md),
+          // Zero bottom padding so the product cutout sits flush against
+          // the bottom edge of the card — matches the reference where
+          // products visually anchor to the bottom of the tile.
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
           child: landscape
               ? Row(
                   children: [
