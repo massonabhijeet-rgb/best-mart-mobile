@@ -993,7 +993,10 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
             crossAxisCount: 2,
             crossAxisSpacing: AppSpacing.md,
             mainAxisSpacing: AppSpacing.md,
-            childAspectRatio: 0.95,
+            // Taller tiles (height ≈ 1.35x width) so the centred title
+            // sits comfortably above a generously-sized product cutout
+            // — matches the Beat-the-heat reference proportions.
+            childAspectRatio: 0.74,
           ),
           itemCount: page.tiles.length,
           itemBuilder: (_, i) => _ThemedTileCard(
@@ -1609,51 +1612,74 @@ class _ThemedTileCard extends StatelessWidget {
     return Color(0xFF000000 | v);
   }
 
-  Widget _labelColumn() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+  Widget _labelColumn() {
+    // Grid tiles centre the title and label across multiple lines (up
+    // to 2) so they read like the Beat-the-heat reference:
+    //   "Refreshing"
+    //   "Coolers"
+    // Landscape (single full-width) tiles keep the existing left-
+    // aligned, vertically-centred treatment because they have room.
+    final crossAlign = landscape
+        ? CrossAxisAlignment.start
+        : CrossAxisAlignment.center;
+    final textAlign = landscape ? TextAlign.start : TextAlign.center;
+    return Column(
+      crossAxisAlignment: crossAlign,
+      mainAxisAlignment:
+          landscape ? MainAxisAlignment.center : MainAxisAlignment.start,
+      children: [
+        Text(
+          tile.label,
+          textAlign: textAlign,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: AppColors.ink,
+            fontSize: landscape ? 22 : 19,
+            fontWeight: FontWeight.w800,
+            height: 1.15,
+          ),
+        ),
+        if ((tile.sublabel ?? '').trim().isNotEmpty) ...[
+          const SizedBox(height: 4),
           Text(
-            tile.label,
+            tile.sublabel!.trim(),
+            textAlign: textAlign,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: AppColors.ink,
-              fontSize: landscape ? 22 : 17,
-              fontWeight: FontWeight.w800,
-              height: 1.15,
+              color: AppColors.inkMuted,
+              fontSize: landscape ? 13 : 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          if ((tile.sublabel ?? '').trim().isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              tile.sublabel!.trim(),
-              style: TextStyle(
-                color: AppColors.inkMuted,
-                fontSize: landscape ? 13 : 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
         ],
-      );
+      ],
+    );
+  }
 
   Widget _imageBox({required bool landscape}) {
     if (tile.imageUrl == null || tile.imageUrl!.isEmpty) {
       return const SizedBox.shrink();
     }
-    // ClipRRect rounds the corners of the image itself — covers the
-    // case where the uploaded artwork has a solid (non-transparent)
-    // background, so it doesn't sit as a sharp rectangle on top of
-    // the rounded tile card.
+    // Landscape tile: image hugs the right edge, full height of the
+    // card (text takes the left column).
+    // Grid tile: image is centred and takes ~92% of available width
+    // so the product cutout reads big and floats on the card's bg —
+    // matches the reference proportions when uploads are transparent
+    // PNGs. ClipRRect handles the rare case of a solid-background
+    // upload.
     return FractionallySizedBox(
-      alignment: Alignment.bottomRight,
-      widthFactor: landscape ? 1 : 0.78,
+      alignment: landscape ? Alignment.bottomRight : Alignment.bottomCenter,
+      widthFactor: landscape ? 1 : 0.92,
       heightFactor: 1,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.md),
         child: Image.network(
           tile.imageUrl!,
           fit: BoxFit.contain,
-          alignment: Alignment.bottomRight,
+          alignment:
+              landscape ? Alignment.bottomRight : Alignment.bottomCenter,
           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
         ),
       ),
