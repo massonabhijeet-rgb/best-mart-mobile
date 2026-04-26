@@ -1640,15 +1640,22 @@ class _ThemedTileCard extends StatelessWidget {
     if (tile.imageUrl == null || tile.imageUrl!.isEmpty) {
       return const SizedBox.shrink();
     }
+    // ClipRRect rounds the corners of the image itself — covers the
+    // case where the uploaded artwork has a solid (non-transparent)
+    // background, so it doesn't sit as a sharp rectangle on top of
+    // the rounded tile card.
     return FractionallySizedBox(
       alignment: Alignment.bottomRight,
       widthFactor: landscape ? 1 : 0.78,
       heightFactor: 1,
-      child: Image.network(
-        tile.imageUrl!,
-        fit: BoxFit.contain,
-        alignment: Alignment.bottomRight,
-        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Image.network(
+          tile.imageUrl!,
+          fit: BoxFit.contain,
+          alignment: Alignment.bottomRight,
+          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        ),
       ),
     );
   }
