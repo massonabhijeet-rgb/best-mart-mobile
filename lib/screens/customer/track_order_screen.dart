@@ -5,7 +5,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import '../../models/models.dart';
 import '../../services/api.dart';
 import '../../services/google_maps_service.dart';
@@ -256,34 +255,9 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Search bar
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _codeCtrl,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: InputDecoration(
-                      hintText: 'Enter tracking code (BM-XXXXXX)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _loading ? null : () => _fetch(_codeCtrl.text),
-                  child: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Track'),
-                ),
-              ],
-            ),
-
+            // Search box + Track button removed — this screen is only
+            // ever opened from My Orders (initialCode is always
+            // present), so manual code entry was just dead UI.
             if (_error.isNotEmpty) ...[
               const SizedBox(height: 10),
               Container(
@@ -407,46 +381,6 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: AppRadius.brSm,
-                                  border:
-                                      Border.all(color: AppColors.borderSoft),
-                                ),
-                                child: QrImageView(
-                                  data: _order!.publicId,
-                                  size: 72,
-                                  backgroundColor: Colors.white,
-                                  version: QrVersions.auto,
-                                  eyeStyle: const QrEyeStyle(
-                                    eyeShape: QrEyeShape.square,
-                                    color: AppColors.ink,
-                                  ),
-                                  dataModuleStyle: const QrDataModuleStyle(
-                                    dataModuleShape:
-                                        QrDataModuleShape.square,
-                                    color: AppColors.ink,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Scan to track',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: AppColors.inkFaint,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                            ],
                           ),
                         ],
                       ),
