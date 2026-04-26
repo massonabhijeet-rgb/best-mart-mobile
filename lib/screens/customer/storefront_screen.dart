@@ -19,7 +19,6 @@ import '../../widgets/product_card.dart';
 import '../../widgets/section_background.dart';
 import '../../widgets/skeleton.dart';
 import 'profile_screen.dart';
-import 'themed_page_screen.dart';
 
 class StorefrontScreen extends StatefulWidget {
   const StorefrontScreen({super.key});
@@ -43,6 +42,14 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   List<Product> _suggestions = const [];
   String _suggestionFor = '';
   Timer? _suggestionDebounce;
+
+  // Currently selected themed page — when non-null, the storefront body
+  // swaps to the hero + tile grid INSTEAD of the regular rails / grid.
+  // Tapping a themed-page chip in the top icon row sets this; tapping
+  // "All" or any category chip clears it (and tapping a tile applies
+  // its filter and clears it too, so the user lands in the regular
+  // filtered grid).
+  ThemedPage? _selectedThemedPage;
 
   // "More from <category>" cache. Keyed by `<search>|<categoryId>` so we
   // re-fetch when either changes, but never thrash on every grid scroll.
@@ -360,7 +367,9 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
             SliverToBoxAdapter(child: _suggestionList()),
           const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
           SliverToBoxAdapter(child: _categoryChips(home)),
-          if (home.isFiltered)
+          if (_selectedThemedPage != null)
+            ..._buildThemedPageSlivers(_selectedThemedPage!)
+          else if (home.isFiltered)
             ..._buildFilteredSlivers(home, context)
           else
             ..._buildHomeSlivers(home),
@@ -710,8 +719,12 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
             icon: Icons.apps_rounded,
             color: AppColors.brandBlue,
             entryIndex: 0,
-            selected: home.categoryId == null,
-            onTap: () => home.setCategory(null),
+            selected:
+                _selectedThemedPage == null && home.categoryId == null,
+            onTap: () {
+              setState(() => _selectedThemedPage = null);
+              home.setCategory(null);
+            },
           ),
           for (var i = 0; i < themed.length; i++)
             _CatIconChip(
@@ -720,11 +733,19 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
               color: AppColors.brandOrange,
               imageUrl: themed[i].navIconUrl,
               entryIndex: i + 1,
-              selected: false,
+              selected: _selectedThemedPage?.id == themed[i].id,
               onTap: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => ThemedPageScreen(page: themed[i]),
-                ));
+                // Inline themed page — swap the storefront body to
+                // hero + tile grid instead of pushing a new screen.
+                setState(() => _selectedThemedPage = themed[i]);
+                home.setCategory(null);
+                if (_scrollCtrl.hasClients) {
+                  _scrollCtrl.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                  );
+                }
               },
             ),
           for (var i = 0; i < picks.length; i++)
@@ -735,10 +756,14 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
               // Stagger by index so the row enters with a soft cascade
               // from the right edge on every storefront mount.
               entryIndex: i + 1 + themed.length,
-              selected: home.categoryId == picks[i].id,
-              onTap: () => home.setCategory(
-                home.categoryId == picks[i].id ? null : picks[i].id,
-              ),
+              selected: _selectedThemedPage == null &&
+                  home.categoryId == picks[i].id,
+              onTap: () {
+                setState(() => _selectedThemedPage = null);
+                home.setCategory(
+                  home.categoryId == picks[i].id ? null : picks[i].id,
+                );
+              },
             ),
         ],
       ),
@@ -869,6 +894,141 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     if (h >= 11 && h < 16) return '☀️';
     if (h >= 16 && h < 21) return '🌇';
     return '🌙';
+  }
+
+  /// Slivers rendered when a themed page is active: hero banner +
+  /// optional subtitle + tile grid. Replaces the regular rails / grid
+  /// for the duration of the selection. Tile tap pops the user out of
+  /// the themed page and applies the matching filter to the regular
+  /// storefront (so the user lands on the filtered grid, not the
+  /// themed page anymore).
+  List<Widget> _buildThemedPageSlivers(ThemedPage page) {
+    final slivers = <Widget>[];
+
+    // Hero image — full-width, rounded.
+    final heroUrl = page.heroImageUrl;
+    if (heroUrl != null && heroUrl.isNotEmpty) {
+      slivers.add(SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            child: AspectRatio(
+              aspectRatio: 16 / 7,
+              child: Image.network(
+                heroUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: AppColors.surface,
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.image_not_supported_outlined,
+                    color: AppColors.inkFaint,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ));
+    }
+
+    final subtitle = (page.subtitle ?? '').trim();
+    if (subtitle.isNotEmpty) {
+      slivers.add(SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 0),
+          child: Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.ink,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ));
+    }
+
+    if (page.tiles.isEmpty) {
+      slivers.add(const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+          child: Center(
+            child: Text(
+              'No tiles yet — check back soon.',
+              style: TextStyle(color: AppColors.inkFaint),
+            ),
+          ),
+        ),
+      ));
+    } else {
+      slivers.add(SliverPadding(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
+        sliver: SliverGrid.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: AppSpacing.md,
+            mainAxisSpacing: AppSpacing.md,
+            childAspectRatio: 0.95,
+          ),
+          itemCount: page.tiles.length,
+          itemBuilder: (_, i) => _ThemedTileCard(
+            tile: page.tiles[i],
+            onTap: () => _onThemedTileTap(page.tiles[i]),
+          ),
+        ),
+      ));
+    }
+
+    return slivers;
+  }
+
+  /// Tile tap dispatch when a themed page is showing inline. We clear
+  /// the themed-page selection and apply the tile's filter so the user
+  /// lands on the regular storefront grid filtered to that selection,
+  /// not on the themed landing page anymore.
+  void _onThemedTileTap(ThemedPageTile tile) {
+    final home = context.read<HomeProvider>();
+    switch (tile.linkType) {
+      case ThemedPageTileLinkType.category:
+        if (tile.linkCategoryId != null) {
+          setState(() => _selectedThemedPage = null);
+          home.setCategory(tile.linkCategoryId!);
+          if (_scrollCtrl.hasClients) {
+            _scrollCtrl.animateTo(0,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut);
+          }
+        }
+        break;
+      case ThemedPageTileLinkType.search:
+        final q = (tile.linkSearchQuery ?? '').trim();
+        if (q.isNotEmpty) {
+          setState(() => _selectedThemedPage = null);
+          _searchCtrl.text = q;
+          home.setSearch(q);
+          ApiService.logSearch(q);
+          if (_scrollCtrl.hasClients) {
+            _scrollCtrl.animateTo(0,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut);
+          }
+        }
+        break;
+      case ThemedPageTileLinkType.productIds:
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Tile "${tile.label}" — coming soon'),
+          duration: const Duration(seconds: 2),
+        ));
+        break;
+      case ThemedPageTileLinkType.unknown:
+        break;
+    }
   }
 
   List<Widget> _buildHomeSlivers(HomeProvider home) {
@@ -1429,6 +1589,80 @@ class _ProfileAvatarButton extends StatelessWidget {
                       height: 1,
                     ),
                   ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Inline themed-page tile card. Lives in storefront_screen.dart (rather
+/// than the standalone ThemedPageScreen) because the storefront now
+/// renders the themed page in-place — taps no longer push a new screen.
+class _ThemedTileCard extends StatelessWidget {
+  final ThemedPageTile tile;
+  final VoidCallback onTap;
+  const _ThemedTileCard({required this.tile, required this.onTap});
+
+  Color? _parseHex(String? hex) {
+    if (hex == null) return null;
+    final s = hex.trim().replaceAll('#', '');
+    if (s.length != 6) return null;
+    final v = int.tryParse(s, radix: 16);
+    if (v == null) return null;
+    return Color(0xFF000000 | v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = _parseHex(tile.bgColor) ?? AppColors.sectionSky;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Container(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+          ),
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tile.label,
+                style: const TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  height: 1.15,
+                ),
+              ),
+              if ((tile.sublabel ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  tile.sublabel!.trim(),
+                  style: const TextStyle(
+                    color: AppColors.inkMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              Expanded(
+                child: Align(
+                  alignment: Alignment.bottomRight,
+                  child: tile.imageUrl != null && tile.imageUrl!.isNotEmpty
+                      ? Image.network(
+                          tile.imageUrl!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ],
           ),
         ),
       ),
