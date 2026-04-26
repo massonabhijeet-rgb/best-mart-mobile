@@ -860,6 +860,23 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
           child: SizedBox(height: AppSpacing.sm),
         ));
 
+    // "Picked for you" — derived server-side from this user's recent
+    // search queries. Placed first because it's the most personal signal
+    // we have; hidden when empty so guests / users with no signal aren't
+    // staring at a blank rail.
+    if (rails.pickedForYou.isNotEmpty) {
+      slivers.add(SliverToBoxAdapter(
+        child: HomeRail(
+          title: 'Picked for you',
+          subtitle: 'Based on what you searched recently',
+          emoji: '✨',
+          tint: SectionTint.lavender,
+          products: rails.pickedForYou,
+        ),
+      ));
+      addGap();
+    }
+
     final spot = home.spotlight;
     if (spot != null && spot.offerProducts.isNotEmpty) {
       slivers.add(SliverToBoxAdapter(

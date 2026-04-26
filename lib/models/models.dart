@@ -364,8 +364,16 @@ class CategoryRail {
 class HomeRails {
   final List<Product> bestsellers;
   final List<CategoryRail> categoryRails;
+  // Personalised rail derived from the signed-in user's recent search
+  // history. Empty for anonymous users or users without recent signal —
+  // UI hides the rail when empty.
+  final List<Product> pickedForYou;
 
-  HomeRails({required this.bestsellers, required this.categoryRails});
+  HomeRails({
+    required this.bestsellers,
+    required this.categoryRails,
+    this.pickedForYou = const [],
+  });
 
   factory HomeRails.fromJson(Map<String, dynamic> j) => HomeRails(
         bestsellers: ((j['bestsellers'] ?? []) as List)
@@ -373,6 +381,9 @@ class HomeRails {
             .toList(),
         categoryRails: ((j['categoryRails'] ?? []) as List)
             .map((r) => CategoryRail.fromJson(r))
+            .toList(),
+        pickedForYou: ((j['pickedForYou'] ?? []) as List)
+            .map((p) => Product.fromJson(p))
             .toList(),
       );
 }
