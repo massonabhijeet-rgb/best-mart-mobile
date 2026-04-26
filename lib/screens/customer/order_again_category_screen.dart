@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -51,40 +53,39 @@ class OrderAgainCategorySheet extends StatelessWidget {
       minChildSize: 0.5,
       expand: false,
       builder: (context, scrollController) {
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            // Floating × button above the sheet, like the reference.
-            Positioned(
-              top: -56,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Material(
-                  color: const Color(0xCC1F2937),
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () => Navigator.of(context).pop(),
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(Icons.close, color: Colors.white, size: 24),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Container(
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(20),
-                ),
+        // Notch-safe + liquid-glass: close button lives INSIDE the
+        // sheet (top-right of the title row) so it never collides with
+        // the iPhone notch when the sheet starts at 92%. The whole
+        // sheet sits behind a BackdropFilter so the storefront's
+        // drifting blob backdrop refracts through it while the sheet
+        // is being dragged down — same family as the themed-tile and
+        // cart preview sheets.
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.92),
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20)),
               ),
               child: Column(
                 children: [
+                  // Drag handle.
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                    padding: const EdgeInsets.only(top: 8, bottom: 4),
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.borderSoft,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 8, 12),
                     child: Row(
                       children: [
                         Expanded(
@@ -95,6 +96,22 @@ class OrderAgainCategorySheet extends StatelessWidget {
                               fontWeight: FontWeight.w900,
                               color: AppColors.ink,
                               letterSpacing: -0.4,
+                            ),
+                          ),
+                        ),
+                        Material(
+                          color: const Color(0x14101828),
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: () => Navigator.of(context).pop(),
+                            child: const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Icon(
+                                Icons.close,
+                                color: AppColors.ink,
+                                size: 22,
+                              ),
                             ),
                           ),
                         ),
@@ -121,7 +138,7 @@ class OrderAgainCategorySheet extends StatelessWidget {
                 ],
               ),
             ),
-          ],
+          ),
         );
       },
     );
