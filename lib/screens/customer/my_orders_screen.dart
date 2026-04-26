@@ -298,6 +298,11 @@ class _OrderCard extends StatelessWidget {
     final more =
         order.items.length > 3 ? ' +${order.items.length - 3} more' : '';
 
+    // Card uses a plain Column so subsequent cards never get crushed
+    // by an unbounded-stretch layout. Border-left of the inner header
+    // strip provides the same status colour cue as the old left-rail
+    // without the Row+CrossAxisAlignment.stretch pattern that was
+    // collapsing cards in the list.
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -310,115 +315,121 @@ class _OrderCard extends StatelessWidget {
         ),
         child: Container(
           decoration: BoxDecoration(
-            // Liquid-glass surface — translucent over the storefront's
-            // drifting blob backdrop. Soft shadow + thin border give
-            // the card depth without the heavy 1.5-pixel surround.
-            color: AppColors.surface.withValues(alpha: 0.88),
+            color: AppColors.surface.withValues(alpha: 0.92),
             borderRadius: AppRadius.brLg,
             border:
                 Border.all(color: AppColors.borderSoft.withValues(alpha: 0.7)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 12,
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Status colour stripe — replaces the heavy gradient
-              // ribbon. A single 4px coloured rail down the left edge
-              // is enough to convey state at a glance.
+              // Header band: faint tint of the status colour so each
+              // card is colour-coded at a glance, plus the order id
+              // and status pill.
               Container(
-                width: 4,
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md, 10, AppSpacing.md, 10),
                 decoration: BoxDecoration(
-                  color: spec.color,
+                  color: spec.color.withValues(alpha: 0.08),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(AppRadius.lg),
-                    bottomLeft: Radius.circular(AppRadius.lg),
+                    topRight: Radius.circular(AppRadius.lg),
                   ),
                 ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '#${order.publicId}',
-                              style: const TextStyle(
-                                color: AppColors.ink,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 15,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ),
-                          _StatusPill(
-                            label: spec.label,
-                            icon: spec.icon,
-                            color: spec.color,
-                            pulsing: inProgress,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatDate(order.createdDate),
-                        style: const TextStyle(
-                          color: AppColors.inkFaint,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        '$itemCount ${itemCount == 1 ? 'item' : 'items'} · $preview$more',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.inkMuted,
-                          fontSize: 13,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Row(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '₹${(order.totalCents / 100).toStringAsFixed(0)}',
+                            '#${order.publicId}',
                             style: const TextStyle(
                               color: AppColors.ink,
                               fontWeight: FontWeight.w900,
-                              fontSize: 16,
+                              fontSize: 14,
+                              letterSpacing: 0.3,
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(height: 2),
                           Text(
-                            inProgress ? 'Track order' : 'View details',
+                            _formatDate(order.createdDate),
                             style: const TextStyle(
-                              color: AppColors.brandBlue,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
+                              color: AppColors.inkFaint,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
                             ),
-                          ),
-                          const SizedBox(width: 2),
-                          const Icon(
-                            Icons.chevron_right_rounded,
-                            color: AppColors.brandBlue,
-                            size: 20,
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                    _StatusPill(
+                      label: spec.label,
+                      icon: spec.icon,
+                      color: spec.color,
+                      pulsing: inProgress,
+                    ),
+                  ],
+                ),
+              ),
+              // Body: items preview + total/CTA row. Plain Column so
+              // intrinsic height is well-defined.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$itemCount ${itemCount == 1 ? 'item' : 'items'} · $preview$more',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.inkMuted,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        Text(
+                          '₹${(order.totalCents / 100).toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 17,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          inProgress ? 'Track order' : 'View details',
+                          style: const TextStyle(
+                            color: AppColors.brandBlue,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.brandBlue,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
