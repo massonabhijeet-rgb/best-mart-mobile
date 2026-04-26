@@ -1585,13 +1585,6 @@ class _ProfileAvatarButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthProvider>().user;
-    final source = (user?.fullName ?? '').trim().isNotEmpty
-        ? user!.fullName!.trim()
-        : (user?.email ?? '').trim();
-    final initial =
-        source.isNotEmpty ? source.characters.first.toUpperCase() : '';
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Material(
@@ -1612,21 +1605,11 @@ class _ProfileAvatarButton extends StatelessWidget {
               color: AppColors.surface,
               border: Border.all(color: AppColors.borderSoft, width: 1),
             ),
-            child: initial.isEmpty
-                ? const Icon(
-                    Icons.person_rounded,
-                    size: 20,
-                    color: AppColors.brandBlueDark,
-                  )
-                : Text(
-                    initial,
-                    style: const TextStyle(
-                      color: AppColors.brandBlueDark,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
-                    ),
-                  ),
+            child: const Icon(
+              Icons.person_rounded,
+              size: 22,
+              color: AppColors.brandBlueDark,
+            ),
           ),
         ),
       ),
@@ -2092,45 +2075,15 @@ class _DeliveryHeaderState extends State<_DeliveryHeader> {
               ),
             ),
             const SizedBox(height: 2),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Text(
-                  '15 minutes',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 32,
-                    letterSpacing: -0.8,
-                    height: 1.05,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.brandBlue.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.storefront_rounded,
-                          size: 14, color: AppColors.brandBlueDark),
-                      SizedBox(width: 4),
-                      Text(
-                        'Express',
-                        style: TextStyle(
-                          color: AppColors.brandBlueDark,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            const Text(
+              '15 minutes',
+              style: TextStyle(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w900,
+                fontSize: 32,
+                letterSpacing: -0.8,
+                height: 1.05,
+              ),
             ),
             const SizedBox(height: 6),
             Material(
