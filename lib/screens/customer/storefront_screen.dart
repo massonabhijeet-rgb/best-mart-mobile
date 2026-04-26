@@ -16,6 +16,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/brand_strip.dart';
 import '../../widgets/category_tiles_grid.dart';
 import '../../widgets/home_rail.dart';
+import '../../widgets/liquid_glass.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/section_background.dart';
 import '../../widgets/skeleton.dart';
@@ -284,32 +285,11 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       backgroundColor: AppColors.pageBg,
       extendBodyBehindAppBar: true,
       appBar: _appBar(),
-      body: ValueListenableBuilder<double>(
-        valueListenable: _heroScrollProgress,
-        builder: (context, progress, child) {
-          // Light-blue hero band that subtly tightens upward as the
-          // user scrolls — at progress=1 the blue stops shorter (less
-          // band visible) and the start hue deepens slightly. Just
-          // enough motion that the page feels alive without ever
-          // distracting from content.
-          final blueTop =
-              Color.lerp(const Color(0xFFD4E5FB), const Color(0xFFB9D6F8), progress)!;
-          final stop1 = 0.34 - (0.10 * progress);
-          final stop2 = 0.40 - (0.08 * progress);
-          return Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [blueTop, blueTop, const Color(0xFFFFFFFF)],
-                stops: [0, stop1.clamp(0.0, 1.0), stop2.clamp(0.0, 1.0)],
-              ),
-            ),
-            child: child,
-          );
-        },
+      body: LiquidGlassBackground(
         // Manually inset for status bar + AppBar height because the
-        // body extends behind the frosted-glass bar.
+        // body extends behind the frosted-glass bar. The drifting
+        // blob layer renders behind everything — search bar, app bar,
+        // section cards on top pick it up through their own blur.
         child: Column(
           children: [
             SizedBox(
@@ -331,10 +311,13 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
         scrolledUnderElevation: 0,
         flexibleSpace: ClipRect(
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            // Sigma 28 + lower-opacity tint so the drifting blob
+            // colors come through more strongly — that's the cue
+            // that reads as "real" glass, not just a flat surface.
+            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.62),
+                color: AppColors.surface.withValues(alpha: 0.48),
                 border: const Border(
                   bottom: BorderSide(
                     color: Color(0x14101828),
@@ -483,7 +466,10 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
                         },
                       ),
                 filled: true,
-                fillColor: AppColors.surface,
+                // Translucent fill so the drifting blob colors behind
+                // peek through the search bar — gives the field the
+                // liquid-glass cast without losing legibility.
+                fillColor: AppColors.surface.withValues(alpha: 0.78),
                 isDense: true,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppRadius.lg),
