@@ -81,10 +81,13 @@ class _BottomNav extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          // Liquid-glass treatment: stronger sigma + lower opacity so
+          // the storefront's drifting blob colors show through, same
+          // dial as the app bar.
+          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
           child: Container(
             decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.82),
+              color: AppColors.surface.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(28),
               border: Border.all(
                 color: AppColors.borderSoft.withValues(alpha: 0.7),

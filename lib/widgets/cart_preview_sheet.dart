@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -34,14 +36,25 @@ class CartPreviewSheet extends StatelessWidget {
       minChildSize: 0.4,
       maxChildSize: 0.92,
       expand: false,
-      builder: (ctx, scrollCtrl) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.pageBg,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppRadius.lg),
-          ),
+      // Liquid-glass surface — ClipRRect rounds the top, BackdropFilter
+      // blurs anything visible behind the sheet (esp. while it's being
+      // dragged down past the storefront's drifting blob backdrop), and
+      // the surface is translucent so the colors come through. Mirrors
+      // the themed-tile sheet for consistency.
+      builder: (ctx, scrollCtrl) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.lg),
         ),
-        child: Column(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.pageBg.withValues(alpha: 0.92),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppRadius.lg),
+              ),
+            ),
+            child: Column(
           children: [
             Container(
               margin: const EdgeInsets.only(top: 10),
@@ -320,6 +333,8 @@ class CartPreviewSheet extends StatelessWidget {
                 ),
               ),
           ],
+        ),
+      ),
         ),
       ),
     );

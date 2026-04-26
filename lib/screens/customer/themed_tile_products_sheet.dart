@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -108,12 +110,22 @@ class _ThemedTileProductsSheetState extends State<ThemedTileProductsSheet> {
         // corner so it never collides with the iPhone notch when the
         // sheet starts at 92% (top edge ends up under the dynamic-
         // island area).
-        return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
+        //
+        // Liquid-glass surface: ClipRRect + BackdropFilter blurs
+        // whatever's behind the sheet (visible while the user drags
+        // the sheet down) and a translucent surface tint gives the
+        // top of the sheet that frosted look matching the rest of the
+        // app's glass treatment.
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.92),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
             children: [
               // Drag handle — small grey pill at the top so the swipe-
               // down-to-dismiss affordance is visible.
@@ -207,6 +219,8 @@ class _ThemedTileProductsSheetState extends State<ThemedTileProductsSheet> {
                               ),
               ),
             ],
+          ),
+            ),
           ),
         );
       },
