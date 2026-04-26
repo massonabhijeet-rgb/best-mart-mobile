@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -51,6 +52,10 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   // its filter and clears it too, so the user lands in the regular
   // filtered grid).
   ThemedPage? _selectedThemedPage;
+
+  // Have we already prefetched themed-page artwork? Only fires once per
+  // storefront mount; flips back to false on logout / re-mount.
+  bool _themedImagesPrefetched = false;
 
   // "More from <category>" cache. Keyed by `<search>|<categoryId>` so we
   // re-fetch when either changes, but never thrash on every grid scroll.
@@ -247,6 +252,18 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     final shop = context.watch<ShopStatusProvider>();
 
     _maybeShowCampaignPopup(home);
+
+    // Prefetch themed-page artwork into the CachedNetworkImage disk
+    // cache the moment /themed-pages returns, so opening a themed
+    // page on first visit doesn't pay the network round-trip per
+    // image. Fires once per storefront mount.
+    if (!_themedImagesPrefetched && home.themedPages.isNotEmpty) {
+      _themedImagesPrefetched = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _prefetchThemedArtwork(home.themedPages);
+      });
+    }
 
     return Scaffold(
       backgroundColor: AppColors.pageBg,
@@ -917,10 +934,12 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
             borderRadius: BorderRadius.circular(AppRadius.lg),
             child: AspectRatio(
               aspectRatio: 16 / 7,
-              child: Image.network(
-                heroUrl,
+              child: CachedNetworkImage(
+                imageUrl: heroUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                fadeInDuration: const Duration(milliseconds: 120),
+                placeholder: (_, __) => Container(color: AppColors.surfaceSoft),
+                errorWidget: (_, __, ___) => Container(
                   color: AppColors.surface,
                   alignment: Alignment.center,
                   child: const Icon(
@@ -1019,6 +1038,35 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   void _onThemedTileTap(ThemedPageTile tile) {
     if (tile.linkType == ThemedPageTileLinkType.unknown) return;
     ThemedTileProductsSheet.show(context: context, tile: tile);
+  }
+
+  /// Warm the disk cache (CachedNetworkImageProvider's underlying
+  /// flutter_cache_manager store) with every themed-page nav icon,
+  /// hero, and tile image. Called once on first sight of themed
+  /// pages so the user doesn't watch each image fetch when they
+  /// later tap into the page.
+  void _prefetchThemedArtwork(List<ThemedPage> pages) {
+    final urls = <String>{};
+    for (final page in pages) {
+      final n = page.navIconUrl;
+      if (n != null && n.isNotEmpty) urls.add(n);
+      final h = page.heroImageUrl;
+      if (h != null && h.isNotEmpty) urls.add(h);
+      for (final t in page.tiles) {
+        final i = t.imageUrl;
+        if (i != null && i.isNotEmpty) urls.add(i);
+      }
+    }
+    for (final url in urls) {
+      // Fire-and-forget; precacheImage propagates load errors that we
+      // don't want to surface here (they'll show via errorWidget when
+      // the user actually opens the page).
+      precacheImage(
+        CachedNetworkImageProvider(url),
+        context,
+        onError: (_, __) {},
+      );
+    }
   }
 
   List<Widget> _buildHomeSlivers(HomeProvider home) {
@@ -1676,12 +1724,15 @@ class _ThemedTileCard extends StatelessWidget {
       heightFactor: 1,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        child: Image.network(
-          tile.imageUrl!,
+        child: CachedNetworkImage(
+          imageUrl: tile.imageUrl!,
           fit: BoxFit.contain,
           alignment:
               landscape ? Alignment.bottomRight : Alignment.bottomCenter,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          memCacheWidth: 720,
+          fadeInDuration: const Duration(milliseconds: 120),
+          placeholder: (_, __) => const SizedBox.shrink(),
+          errorWidget: (_, __, ___) => const SizedBox.shrink(),
         ),
       ),
     );
@@ -1807,12 +1858,17 @@ class _CatIconChip extends StatelessWidget {
                       ? Clip.antiAlias
                       : Clip.none,
                   child: imageUrl != null && imageUrl!.isNotEmpty
-                      ? Image.network(
-                          imageUrl!,
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl!,
                           width: 48,
                           height: 48,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
+                          memCacheWidth: 192,
+                          memCacheHeight: 192,
+                          fadeInDuration: const Duration(milliseconds: 120),
+                          placeholder: (_, __) =>
+                              Icon(icon, color: color, size: 24),
+                          errorWidget: (_, __, ___) =>
                               Icon(icon, color: color, size: 24),
                         )
                       : Icon(icon, color: color, size: 24),
