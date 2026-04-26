@@ -335,9 +335,12 @@ class _ProductImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (url == null || url!.isEmpty) return _fallback();
+    // BoxFit.contain so tall product photos (bottles, standing packets,
+    // etc.) aren't cropped at the head — the surrounding gradient
+    // backdrop fills any letter/pillar-box space cleanly.
     return CachedNetworkImage(
       imageUrl: url!,
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
       memCacheWidth: 400,
       memCacheHeight: 400,
       fadeInDuration: const Duration(milliseconds: 180),
