@@ -80,17 +80,45 @@ class _HomeRailState extends State<HomeRail> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        widget.title,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.ink,
-                          letterSpacing: -0.2,
-                          height: 1.1,
+                      // One-time shine sweep across the section title on
+                      // first paint — a brighter band slides left → right
+                      // over the dark text. TweenAnimationBuilder fires
+                      // once per HomeRail mount so it doesn't loop and
+                      // become distracting.
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.0, end: 1.0),
+                        duration: const Duration(milliseconds: 1100),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, t, child) {
+                          return ShaderMask(
+                            blendMode: BlendMode.srcATop,
+                            shaderCallback: (bounds) {
+                              return LinearGradient(
+                                begin: Alignment(-1.5 + 3 * t, 0),
+                                end: Alignment(-0.5 + 3 * t, 0),
+                                colors: const [
+                                  AppColors.ink,
+                                  Colors.white,
+                                  AppColors.ink,
+                                ],
+                                stops: const [0.0, 0.5, 1.0],
+                              ).createShader(bounds);
+                            },
+                            child: child,
+                          );
+                        },
+                        child: Text(
+                          widget.title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.ink,
+                            letterSpacing: -0.2,
+                            height: 1.1,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       if (widget.subtitle != null) ...[
                         const SizedBox(height: 2),
