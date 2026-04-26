@@ -57,6 +57,12 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   // storefront mount; flips back to false on logout / re-mount.
   bool _themedImagesPrefetched = false;
 
+  // 0.0 (top of page) → 1.0 (~200dp scrolled). Drives the subtle
+  // gradient shift on the hero band so the page feels alive when the
+  // user scrolls. Updated from _onScroll so we don't setState on every
+  // scroll tick — only the gradient layer rebuilds.
+  final ValueNotifier<double> _heroScrollProgress = ValueNotifier(0);
+
   // "More from <category>" cache. Keyed by `<search>|<categoryId>` so we
   // re-fetch when either changes, but never thrash on every grid scroll.
   String? _relatedSig;
@@ -110,6 +116,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     _searchCtrl.dispose();
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
+    _heroScrollProgress.dispose();
     super.dispose();
   }
 
@@ -142,6 +149,14 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   }
 
   void _onScroll() {
+    // Hero gradient progress: 0..1 over the first 200dp of scroll.
+    if (_scrollCtrl.hasClients) {
+      final px = _scrollCtrl.position.pixels.clamp(0.0, 200.0);
+      final progress = (px / 200.0).clamp(0.0, 1.0);
+      if ((progress - _heroScrollProgress.value).abs() > 0.01) {
+        _heroScrollProgress.value = progress;
+      }
+    }
     final home = context.read<HomeProvider>();
     if (!home.isFiltered) return;
     if (!home.hasMore || home.loadingMore) return;
@@ -269,23 +284,30 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       backgroundColor: AppColors.pageBg,
       extendBodyBehindAppBar: true,
       appBar: _appBar(),
-      body: Container(
-        // Solid light-blue hero band (top ~30% — covers app bar, delivery
-        // header, search bar, and category icon row) that transitions
-        // sharply to white. Mirrors the Blinkit reference but in our
-        // brand palette instead of yellow.
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFD4E5FB),
-              Color(0xFFD4E5FB),
-              Color(0xFFFFFFFF),
-            ],
-            stops: [0, 0.34, 0.40],
-          ),
-        ),
+      body: ValueListenableBuilder<double>(
+        valueListenable: _heroScrollProgress,
+        builder: (context, progress, child) {
+          // Light-blue hero band that subtly tightens upward as the
+          // user scrolls — at progress=1 the blue stops shorter (less
+          // band visible) and the start hue deepens slightly. Just
+          // enough motion that the page feels alive without ever
+          // distracting from content.
+          final blueTop =
+              Color.lerp(const Color(0xFFD4E5FB), const Color(0xFFB9D6F8), progress)!;
+          final stop1 = 0.34 - (0.10 * progress);
+          final stop2 = 0.40 - (0.08 * progress);
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [blueTop, blueTop, const Color(0xFFFFFFFF)],
+                stops: [0, stop1.clamp(0.0, 1.0), stop2.clamp(0.0, 1.0)],
+              ),
+            ),
+            child: child,
+          );
+        },
         // Manually inset for status bar + AppBar height because the
         // body extends behind the frosted-glass bar.
         child: Column(
@@ -1976,14 +1998,42 @@ class _DeliveryHeader extends StatefulWidget {
   State<_DeliveryHeader> createState() => _DeliveryHeaderState();
 }
 
-class _DeliveryHeaderState extends State<_DeliveryHeader> {
+class _DeliveryHeaderState extends State<_DeliveryHeader>
+    with TickerProviderStateMixin {
   List<SavedAddress> _addresses = [];
   SavedAddress? _picked;
+
+  // Entrance animation: header slides up + fades in on first build so
+  // it doesn't pop in flat. Fires once per mount.
+  late final AnimationController _entranceCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+  );
+  late final Animation<double> _entranceFade = CurvedAnimation(
+    parent: _entranceCtrl,
+    curve: Curves.easeOutCubic,
+  );
+
+  // Rolling number animation: ticks 0 → 15 over ~700ms so the "15
+  // minutes" hero feels alive when the home page lands.
+  late final AnimationController _rollCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
 
   @override
   void initState() {
     super.initState();
     _loadAddresses();
+    _entranceCtrl.forward();
+    _rollCtrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _entranceCtrl.dispose();
+    _rollCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAddresses() async {
@@ -2055,7 +2105,19 @@ class _DeliveryHeaderState extends State<_DeliveryHeader> {
     if (context.watch<ShopStatusProvider>().isClosed) {
       return const SizedBox.shrink();
     }
-    return Padding(
+    return AnimatedBuilder(
+      animation: _entranceFade,
+      builder: (context, child) {
+        // Slide from 12px below + fade. CurvedAnimation already eases.
+        return Opacity(
+          opacity: _entranceFade.value,
+          child: Transform.translate(
+            offset: Offset(0, 12 * (1 - _entranceFade.value)),
+            child: child,
+          ),
+        );
+      },
+      child: Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.md,
           AppSpacing.sm,
@@ -2075,15 +2137,25 @@ class _DeliveryHeaderState extends State<_DeliveryHeader> {
               ),
             ),
             const SizedBox(height: 2),
-            const Text(
-              '15 minutes',
-              style: TextStyle(
-                color: AppColors.ink,
-                fontWeight: FontWeight.w900,
-                fontSize: 32,
-                letterSpacing: -0.8,
-                height: 1.05,
-              ),
+            // Rolling counter: ticks from 0 → 15 on first paint so the
+            // hero number reads as a live, animating value rather than
+            // a static label.
+            AnimatedBuilder(
+              animation: _rollCtrl,
+              builder: (_, __) {
+                final n = (15 * Curves.easeOutCubic.transform(_rollCtrl.value))
+                    .round();
+                return Text(
+                  '$n minutes',
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 32,
+                    letterSpacing: -0.8,
+                    height: 1.05,
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 6),
             Material(
