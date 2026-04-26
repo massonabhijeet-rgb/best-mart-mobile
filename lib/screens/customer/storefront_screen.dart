@@ -1007,47 +1007,14 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     return slivers;
   }
 
-  /// Tile tap dispatch when a themed page is showing inline. We clear
-  /// the themed-page selection and apply the tile's filter so the user
-  /// lands on the regular storefront grid filtered to that selection,
-  /// not on the themed landing page anymore.
+  /// Tile tap inside a themed page. Per product preference: do NOT
+  /// navigate away from the themed page or apply a filter — taps stay
+  /// on the same screen. The InkWell still ripples for tactile
+  /// feedback. If we want tile-driven product browsing later, we'll
+  /// render the matching products inline below the tile grid instead
+  /// of pushing them into the regular storefront filter.
   void _onThemedTileTap(ThemedPageTile tile) {
-    final home = context.read<HomeProvider>();
-    switch (tile.linkType) {
-      case ThemedPageTileLinkType.category:
-        if (tile.linkCategoryId != null) {
-          setState(() => _selectedThemedPage = null);
-          home.setCategory(tile.linkCategoryId!);
-          if (_scrollCtrl.hasClients) {
-            _scrollCtrl.animateTo(0,
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut);
-          }
-        }
-        break;
-      case ThemedPageTileLinkType.search:
-        final q = (tile.linkSearchQuery ?? '').trim();
-        if (q.isNotEmpty) {
-          setState(() => _selectedThemedPage = null);
-          _searchCtrl.text = q;
-          home.setSearch(q);
-          ApiService.logSearch(q);
-          if (_scrollCtrl.hasClients) {
-            _scrollCtrl.animateTo(0,
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut);
-          }
-        }
-        break;
-      case ThemedPageTileLinkType.productIds:
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Tile "${tile.label}" — coming soon'),
-          duration: const Duration(seconds: 2),
-        ));
-        break;
-      case ThemedPageTileLinkType.unknown:
-        break;
-    }
+    // intentionally empty
   }
 
   List<Widget> _buildHomeSlivers(HomeProvider home) {
