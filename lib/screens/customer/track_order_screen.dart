@@ -77,27 +77,48 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     });
   }
 
-  /// Builds the rider + destination map pins by drawing them with
-  /// Canvas — gives us a recognisable scooter / home glyph on a
-  /// branded circle instead of the generic Google Maps coloured
-  /// droplet. Done once on mount; subsequent location updates
-  /// reuse the cached bitmaps.
+  /// Builds the rider + destination map pins. The rider uses a
+  /// custom PNG asset (assets/icon/rider_icon.png) downsized to a
+  /// pin-friendly size; the destination is Canvas-drawn so we
+  /// don't need a second asset for it. Built once on mount and
+  /// cached so location updates don't re-create the bitmap.
   Future<void> _buildCustomMarkers() async {
-    final rider = await _circleIconMarker(
-      icon: Icons.delivery_dining_rounded,
-      ringColor: AppColors.brandOrange,
-      iconColor: AppColors.brandOrange,
+    final rider = await _bitmapFromAsset(
+      'assets/icon/rider_icon.png',
+      targetSize: 86, // logical pixels — kept small so the pin
+                     //   doesn't dominate the 220-tall map area.
     );
     final destination = await _circleIconMarker(
       icon: Icons.home_rounded,
       ringColor: AppColors.danger,
       iconColor: AppColors.danger,
+      size: 84,
     );
     if (!mounted) return;
     setState(() {
       _riderMarkerIcon = rider;
       _destinationMarkerIcon = destination;
     });
+  }
+
+  /// Loads a PNG asset, resizes it to `targetSize`, and returns it
+  /// as a BitmapDescriptor. Uses `instantiateImageCodec` with target
+  /// dimensions so a high-res source PNG (e.g. 1024×1024) doesn't
+  /// render as a giant pin on the map.
+  Future<BitmapDescriptor> _bitmapFromAsset(
+    String assetPath, {
+    required int targetSize,
+  }) async {
+    final data = await rootBundle.load(assetPath);
+    final codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: targetSize,
+      targetHeight: targetSize,
+    );
+    final frame = await codec.getNextFrame();
+    final bytes =
+        await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
   /// Renders a circular marker bitmap: outer coloured ring + white
