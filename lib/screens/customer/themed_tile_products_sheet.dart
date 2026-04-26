@@ -74,7 +74,12 @@ class _ThemedTileProductsSheetState extends State<ThemedTileProductsSheet> {
         case ThemedPageTileLinkType.unknown:
           // No "list-of-N-product-ids" surface yet; show empty state.
           page = ProductPage(
-              products: const [], total: 0, page: 1, pageSize: 0);
+            products: const [],
+            total: 0,
+            page: 1,
+            pageSize: 0,
+            hasMore: false,
+          );
           break;
       }
       if (!mounted) return;
