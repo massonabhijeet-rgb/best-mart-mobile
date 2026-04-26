@@ -279,9 +279,21 @@ class ApiService {
     return Order.fromJson(data['order']);
   }
 
-  static Future<Order> trackOrder(String publicId) async {
+  /// Track-order response now also carries the assigned rider's
+  /// last-known location so the customer's map paints immediately on
+  /// open (instead of waiting for the next WS ping that may never
+  /// come if the rider is stationary).
+  static Future<({Order order, RiderLocation? riderLocation})> trackOrder(
+      String publicId) async {
     final data = await _req('GET', '/orders/track/$publicId');
-    return Order.fromJson(data['order']);
+    final order = Order.fromJson(data['order']);
+    final rider = data['riderLocation'];
+    return (
+      order: order,
+      riderLocation: rider is Map
+          ? RiderLocation.fromJson(Map<String, dynamic>.from(rider))
+          : null,
+    );
   }
 
   static Future<List<Order>> getMyOrders() async {

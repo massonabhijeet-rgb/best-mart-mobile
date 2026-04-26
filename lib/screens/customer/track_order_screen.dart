@@ -123,17 +123,31 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   Future<void> _fetch(String code) async {
     setState(() { _loading = true; _error = ''; });
     try {
-      final order = await ApiService.trackOrder(code.trim().toUpperCase());
+      final result = await ApiService.trackOrder(code.trim().toUpperCase());
       setState(() {
-        _order = order;
-        if (order.status == 'delivered') _deliveredBanner = true;
+        _order = result.order;
+        // Seed rider location from the response so the map paints
+        // immediately if the order is already out for delivery and the
+        // server has a cached position. Otherwise the customer would
+        // wait for the next WS ping (up to 10s, or never if rider is
+        // stationary).
+        if (result.riderLocation != null) {
+          _riderLocation = result.riderLocation;
+        }
+        if (result.order.status == 'delivered') _deliveredBanner = true;
       });
       _maybeFetchRoute();
       _pollTimer?.cancel();
       _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
         try {
           final updated = await ApiService.trackOrder(code.trim().toUpperCase());
-          if (mounted) setState(() => _order = updated);
+          if (!mounted) return;
+          setState(() {
+            _order = updated.order;
+            if (updated.riderLocation != null) {
+              _riderLocation = updated.riderLocation;
+            }
+          });
         } catch (_) {}
       });
     } catch (e) {
