@@ -19,6 +19,7 @@ import '../../widgets/product_card.dart';
 import '../../widgets/section_background.dart';
 import '../../widgets/skeleton.dart';
 import 'profile_screen.dart';
+import 'themed_tile_products_sheet.dart';
 
 class StorefrontScreen extends StatefulWidget {
   const StorefrontScreen({super.key});
@@ -1010,14 +1011,14 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     return slivers;
   }
 
-  /// Tile tap inside a themed page. Per product preference: do NOT
-  /// navigate away from the themed page or apply a filter — taps stay
-  /// on the same screen. The InkWell still ripples for tactile
-  /// feedback. If we want tile-driven product browsing later, we'll
-  /// render the matching products inline below the tile grid instead
-  /// of pushing them into the regular storefront filter.
+  /// Tile tap inside a themed page opens a bottom sheet with the
+  /// matching products (resolved from the tile's link target). The
+  /// sheet dismisses straight back to the themed page so the customer
+  /// never leaves the themed-page context — no navigation away from
+  /// the storefront layout, no global filter applied.
   void _onThemedTileTap(ThemedPageTile tile) {
-    // intentionally empty
+    if (tile.linkType == ThemedPageTileLinkType.unknown) return;
+    ThemedTileProductsSheet.show(context: context, tile: tile);
   }
 
   List<Widget> _buildHomeSlivers(HomeProvider home) {
