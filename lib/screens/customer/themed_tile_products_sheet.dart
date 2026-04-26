@@ -104,106 +104,110 @@ class _ThemedTileProductsSheetState extends State<ThemedTileProductsSheet> {
       minChildSize: 0.5,
       expand: false,
       builder: (context, scrollController) {
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            // Floating × button above the sheet so the close target is
-            // a fixed, easy-to-hit affordance — mirrors the Order Again
-            // sheet's pattern.
-            Positioned(
-              top: -56,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Material(
-                  color: const Color(0xCC1F2937),
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () => Navigator.of(context).pop(),
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(Icons.close, color: Colors.white, size: 24),
-                    ),
+        // Close button now lives INSIDE the sheet at the top-right
+        // corner so it never collides with the iPhone notch when the
+        // sheet starts at 92% (top edge ends up under the dynamic-
+        // island area).
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Drag handle — small grey pill at the top so the swipe-
+              // down-to-dismiss affordance is visible.
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 4),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.borderSoft,
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
-            ),
-            Container(
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(20),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            widget.tile.label,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.ink,
-                              letterSpacing: -0.4,
-                            ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 8, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.tile.label,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.ink,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                    ),
+                    Material(
+                      color: const Color(0x14101828),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => Navigator.of(context).pop(),
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(
+                            Icons.close,
+                            color: AppColors.ink,
+                            size: 22,
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: _loading
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.brandBlue,
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _loading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.brandBlue,
+                        ),
+                      )
+                    : _error != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: AppColors.inkFaint,
+                                ),
+                              ),
                             ),
                           )
-                        : _error != null
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(24),
-                                  child: Text(
-                                    _error!,
-                                    style: const TextStyle(
-                                      color: AppColors.inkFaint,
-                                    ),
-                                  ),
+                        : _products.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No products yet.',
+                                  style:
+                                      TextStyle(color: AppColors.inkFaint),
                                 ),
                               )
-                            : _products.isEmpty
-                                ? const Center(
-                                    child: Text(
-                                      'No products yet.',
-                                      style:
-                                          TextStyle(color: AppColors.inkFaint),
-                                    ),
-                                  )
-                                : GridView.builder(
-                                    controller: scrollController,
-                                    padding: const EdgeInsets.fromLTRB(
-                                        12, 4, 12, 24),
-                                    itemCount: _products.length,
-                                    gridDelegate:
-                                        const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
-                                      crossAxisSpacing: 8,
-                                      mainAxisSpacing: 12,
-                                      childAspectRatio: 0.62,
-                                    ),
-                                    itemBuilder: (_, i) => _GridProductCard(
-                                      product: _products[i],
-                                    ),
-                                  ),
-                  ),
-                ],
+                            : GridView.builder(
+                                controller: scrollController,
+                                padding: const EdgeInsets.fromLTRB(
+                                    12, 4, 12, 24),
+                                itemCount: _products.length,
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  crossAxisSpacing: 8,
+                                  mainAxisSpacing: 12,
+                                  childAspectRatio: 0.62,
+                                ),
+                                itemBuilder: (_, i) => _GridProductCard(
+                                  product: _products[i],
+                                ),
+                              ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );

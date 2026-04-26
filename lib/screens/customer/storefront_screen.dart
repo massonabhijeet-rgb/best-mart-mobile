@@ -721,11 +721,17 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       ['bread', 'bakery'],
       ['care', 'beauty', 'personal'],
     ];
+    // Only surface categories whose name fits the chip without an
+    // ellipsis — at the chip's 68dp width and 11.5pt label, ~10 chars
+    // is the practical cutoff. Long names like "Dairy & Bakery" get
+    // skipped so the user only sees clean, fully-readable labels.
+    bool nameFits(Category c) => c.name.trim().length <= 10;
     final picks = <Category>[];
     final usedIds = <int>{};
     for (final group in dailyKeywords) {
       for (final c in pool) {
         if (usedIds.contains(c.id)) continue;
+        if (!nameFits(c)) continue;
         final n = c.name.toLowerCase();
         if (group.any(n.contains)) {
           picks.add(c);
@@ -734,11 +740,12 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
         }
       }
     }
-    // Top up with whatever's left so users with off-keyword names
-    // still see their categories.
+    // Top up with whatever's left (still respecting the fits-without-
+    // truncation rule) so users with off-keyword names still see them.
     for (final c in pool) {
       if (picks.length >= 6) break;
       if (usedIds.contains(c.id)) continue;
+      if (!nameFits(c)) continue;
       picks.add(c);
       usedIds.add(c.id);
     }
@@ -813,64 +820,70 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   // Icon + accent colour for the top-row category chip. Looked up by
   // category-name keyword so admins don't have to upload icons; the
   // tinted circle behind the icon picks up the same colour at low alpha.
+  /// Modernised icon mapping: thin-stroke OUTLINED Material Icons on
+  /// a neutral background — matches the clean sun-icon style of admin-
+  /// uploaded themed-page nav icons. Old version used filled icons on
+  /// brand-tinted circles which read as "old design" against the
+  /// illustrative themed icons.
   static (IconData, Color) _iconForCategory(String name) {
+    const ink = AppColors.ink;
     final n = name.toLowerCase();
     if (n.contains('fruit') || n.contains('veg')) {
-      return (Icons.eco_rounded, const Color(0xFF1A7A44));
+      return (Icons.eco_outlined, ink);
     }
     if (n.contains('dairy') || n.contains('milk') || n.contains('egg')) {
-      return (Icons.local_drink_rounded, const Color(0xFF1976D2));
+      return (Icons.water_drop_outlined, ink);
     }
     if (n.contains('bread') || n.contains('bakery')) {
-      return (Icons.bakery_dining_rounded, const Color(0xFFC97A1F));
+      return (Icons.bakery_dining_outlined, ink);
     }
     if (n.contains('meat') || n.contains('chicken') || n.contains('fish')) {
-      return (Icons.set_meal_rounded, const Color(0xFFB71C1C));
+      return (Icons.set_meal_outlined, ink);
     }
     if (n.contains('snack') || n.contains('chip') || n.contains('namkeen')) {
-      return (Icons.cookie_rounded, const Color(0xFFE07B00));
+      return (Icons.cookie_outlined, ink);
     }
     if (n.contains('drink') || n.contains('bever') || n.contains('juice')) {
-      return (Icons.local_cafe_rounded, const Color(0xFF1976D2));
+      return (Icons.local_drink_outlined, ink);
     }
     if (n.contains('choco') || n.contains('sweet') || n.contains('candy')) {
-      return (Icons.cake_rounded, const Color(0xFF6D4C41));
+      return (Icons.cake_outlined, ink);
     }
     if (n.contains('personal') || n.contains('care') || n.contains('beauty')) {
-      return (Icons.brush_rounded, const Color(0xFFC2185B));
+      return (Icons.face_retouching_natural_outlined, ink);
     }
     if (n.contains('home') || n.contains('clean') || n.contains('house')) {
-      return (Icons.cleaning_services_rounded, const Color(0xFF00838F));
+      return (Icons.cleaning_services_outlined, ink);
     }
     if (n.contains('frozen') || n.contains('ice')) {
-      return (Icons.ac_unit_rounded, const Color(0xFF03A9F4));
+      return (Icons.ac_unit_outlined, ink);
     }
     if (n.contains('rice') || n.contains('atta') || n.contains('flour') ||
         n.contains('grain') || n.contains('dal')) {
-      return (Icons.grain_rounded, const Color(0xFF8D6E63));
+      return (Icons.grain_outlined, ink);
     }
     if (n.contains('oil') || n.contains('ghee')) {
-      return (Icons.opacity_rounded, const Color(0xFFFFA000));
+      return (Icons.opacity_outlined, ink);
     }
     if (n.contains('tea') || n.contains('coffee')) {
-      return (Icons.coffee_rounded, const Color(0xFF5D4037));
+      return (Icons.coffee_outlined, ink);
     }
     if (n.contains('baby') || n.contains('kid')) {
-      return (Icons.child_care_rounded, const Color(0xFFF06292));
+      return (Icons.child_care_outlined, ink);
     }
     if (n.contains('pet')) {
-      return (Icons.pets_rounded, const Color(0xFF795548));
+      return (Icons.pets_outlined, ink);
     }
     if (n.contains('summer') || n.contains('cool')) {
-      return (Icons.wb_sunny_rounded, const Color(0xFFFB8C00));
+      return (Icons.wb_sunny_outlined, ink);
     }
     if (n.contains('electronic') || n.contains('appliance')) {
-      return (Icons.headphones_rounded, const Color(0xFF512DA8));
+      return (Icons.headphones_outlined, ink);
     }
     if (n.contains('pharma') || n.contains('health') || n.contains('medic')) {
-      return (Icons.medication_rounded, const Color(0xFF388E3C));
+      return (Icons.medical_services_outlined, ink);
     }
-    return (Icons.shopping_basket_rounded, AppColors.brandBlue);
+    return (Icons.shopping_basket_outlined, ink);
   }
 
   String _bestsellerTitle() {
@@ -1856,8 +1869,16 @@ class _CatIconChip extends StatelessWidget {
                   height: 48,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.16),
+                    // Neutral white background like the themed-page nav
+                    // icons — replaces the brand-tinted circle that read
+                    // as "old design" next to admin-uploaded illustrated
+                    // icons.
+                    color: AppColors.surface,
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.borderSoft,
+                      width: 1,
+                    ),
                   ),
                   clipBehavior: imageUrl != null && imageUrl!.isNotEmpty
                       ? Clip.antiAlias
