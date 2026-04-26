@@ -966,9 +966,10 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
         ),
       ));
     } else if (page.tiles.length == 1) {
-      // Single tile in a 2-col grid stranded one in the left half. With
-      // exactly one tile, span the full width as a landscape card so the
-      // page doesn't look broken.
+      // Single tile uses a landscape Row layout (text on the left,
+      // product image on the right) instead of the column layout the
+      // grid tiles use — text would otherwise look stranded on top of
+      // a huge image when the card is full-width.
       slivers.add(SliverPadding(
         padding: const EdgeInsets.fromLTRB(
             AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
@@ -977,6 +978,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
             aspectRatio: 16 / 8.5,
             child: _ThemedTileCard(
               tile: page.tiles.first,
+              landscape: true,
               onTap: () => _onThemedTileTap(page.tiles.first),
             ),
           ),
@@ -1616,10 +1618,20 @@ class _ProfileAvatarButton extends StatelessWidget {
 /// Inline themed-page tile card. Lives in storefront_screen.dart (rather
 /// than the standalone ThemedPageScreen) because the storefront now
 /// renders the themed page in-place — taps no longer push a new screen.
+///
+/// `landscape: true` switches from the default column layout (text top,
+/// image bottom-right) to a Row (text left, image right). Used when a
+/// single tile spans the full width — the column layout strands the
+/// labels above a huge image.
 class _ThemedTileCard extends StatelessWidget {
   final ThemedPageTile tile;
+  final bool landscape;
   final VoidCallback onTap;
-  const _ThemedTileCard({required this.tile, required this.onTap});
+  const _ThemedTileCard({
+    required this.tile,
+    required this.onTap,
+    this.landscape = false,
+  });
 
   Color? _parseHex(String? hex) {
     if (hex == null) return null;
@@ -1628,6 +1640,50 @@ class _ThemedTileCard extends StatelessWidget {
     final v = int.tryParse(s, radix: 16);
     if (v == null) return null;
     return Color(0xFF000000 | v);
+  }
+
+  Widget _labelColumn() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            tile.label,
+            style: TextStyle(
+              color: AppColors.ink,
+              fontSize: landscape ? 22 : 17,
+              fontWeight: FontWeight.w800,
+              height: 1.15,
+            ),
+          ),
+          if ((tile.sublabel ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              tile.sublabel!.trim(),
+              style: TextStyle(
+                color: AppColors.inkMuted,
+                fontSize: landscape ? 13 : 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      );
+
+  Widget _imageBox({required bool landscape}) {
+    if (tile.imageUrl == null || tile.imageUrl!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return FractionallySizedBox(
+      alignment: Alignment.bottomRight,
+      widthFactor: landscape ? 1 : 0.78,
+      heightFactor: 1,
+      child: Image.network(
+        tile.imageUrl!,
+        fit: BoxFit.contain,
+        alignment: Alignment.bottomRight,
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      ),
+    );
   }
 
   @override
@@ -1644,50 +1700,20 @@ class _ThemedTileCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                tile.label,
-                style: const TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  height: 1.15,
+          child: landscape
+              ? Row(
+                  children: [
+                    Expanded(flex: 5, child: _labelColumn()),
+                    Expanded(flex: 6, child: _imageBox(landscape: true)),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _labelColumn(),
+                    Expanded(child: _imageBox(landscape: false)),
+                  ],
                 ),
-              ),
-              if ((tile.sublabel ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  tile.sublabel!.trim(),
-                  style: const TextStyle(
-                    color: AppColors.inkMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-              // FractionallySizedBox + bottomRight alignment gives the
-              // product cutout look from the reference: image floats in
-              // the bottom-right corner with negative space around it
-              // instead of expanding to fill the whole cell.
-              Expanded(
-                child: tile.imageUrl != null && tile.imageUrl!.isNotEmpty
-                    ? FractionallySizedBox(
-                        alignment: Alignment.bottomRight,
-                        widthFactor: 0.78,
-                        heightFactor: 1,
-                        child: Image.network(
-                          tile.imageUrl!,
-                          fit: BoxFit.contain,
-                          alignment: Alignment.bottomRight,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ],
-          ),
         ),
       ),
     );
