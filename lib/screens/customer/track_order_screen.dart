@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -40,11 +41,19 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   int? _routeEtaSeconds;
   String? _decodedPolylineCache;
 
+  // Custom map markers — built once on screen mount so the rider shows
+  // up as a recognisable scooter pin (and the destination as a home
+  // pin) instead of the generic Google Maps coloured droplets. Falls
+  // back to the default coloured pin until the bitmaps are ready.
+  BitmapDescriptor? _riderMarkerIcon;
+  BitmapDescriptor? _destinationMarkerIcon;
+
   static const _timeline = ['placed', 'confirmed', 'packing', 'out_for_delivery', 'delivered'];
 
   @override
   void initState() {
     super.initState();
+    _buildCustomMarkers();
     if (widget.initialCode != null) {
       _codeCtrl.text = widget.initialCode!;
       _fetch(widget.initialCode!);
@@ -67,6 +76,87 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         _maybeFetchRoute();
       }
     });
+  }
+
+  /// Builds the rider + destination map pins by drawing them with
+  /// Canvas — gives us a recognisable scooter / home glyph on a
+  /// branded circle instead of the generic Google Maps coloured
+  /// droplet. Done once on mount; subsequent location updates
+  /// reuse the cached bitmaps.
+  Future<void> _buildCustomMarkers() async {
+    final rider = await _circleIconMarker(
+      icon: Icons.delivery_dining_rounded,
+      ringColor: AppColors.brandOrange,
+      iconColor: AppColors.brandOrange,
+    );
+    final destination = await _circleIconMarker(
+      icon: Icons.home_rounded,
+      ringColor: AppColors.danger,
+      iconColor: AppColors.danger,
+    );
+    if (!mounted) return;
+    setState(() {
+      _riderMarkerIcon = rider;
+      _destinationMarkerIcon = destination;
+    });
+  }
+
+  /// Renders a circular marker bitmap: outer coloured ring + white
+  /// inner disc + the supplied Material icon glyph centred on top.
+  /// Returned as a BitmapDescriptor ready to drop into a Marker.
+  Future<BitmapDescriptor> _circleIconMarker({
+    required IconData icon,
+    required Color ringColor,
+    required Color iconColor,
+    double size = 110,
+  }) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final centre = Offset(size / 2, size / 2);
+
+    // Soft outer shadow so the pin lifts off the map.
+    canvas.drawCircle(
+      centre.translate(0, 3),
+      size / 2 - 4,
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.18)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+    // Coloured outer ring.
+    canvas.drawCircle(
+      centre,
+      size / 2 - 4,
+      Paint()..color = ringColor,
+    );
+    // White inner disc so the icon reads against the ring colour.
+    canvas.drawCircle(
+      centre,
+      size / 2 - 12,
+      Paint()..color = Colors.white,
+    );
+    // Icon glyph rendered as text using the icon's font.
+    final tp = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(icon.codePoint),
+        style: TextStyle(
+          fontSize: size * 0.55,
+          fontFamily: icon.fontFamily,
+          package: icon.fontPackage,
+          color: iconColor,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(
+      canvas,
+      Offset((size - tp.width) / 2, (size - tp.height) / 2),
+    );
+
+    final image = await recorder
+        .endRecording()
+        .toImage(size.toInt(), size.toInt());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
   Future<void> _maybeFetchRoute() async {
@@ -543,8 +633,15 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                 markerId: const MarkerId('rider'),
                                 position: LatLng(
                                     _riderLocation!.latitude, _riderLocation!.longitude),
-                                icon: BitmapDescriptor.defaultMarkerWithHue(
-                                    BitmapDescriptor.hueOrange),
+                                // Custom scooter pin (orange ring + delivery
+                                // glyph) once the bitmap has been built;
+                                // falls back to the default coloured pin
+                                // for the first frame so the marker isn't
+                                // missing while we're rendering.
+                                icon: _riderMarkerIcon ??
+                                    BitmapDescriptor.defaultMarkerWithHue(
+                                        BitmapDescriptor.hueOrange),
+                                anchor: const Offset(0.5, 0.5),
                                 infoWindow: const InfoWindow(title: 'Rider'),
                               ),
                               if (_order!.deliveryLatitude != null &&
@@ -553,8 +650,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                   markerId: const MarkerId('delivery'),
                                   position: LatLng(_order!.deliveryLatitude!,
                                       _order!.deliveryLongitude!),
-                                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                                      BitmapDescriptor.hueRed),
+                                  icon: _destinationMarkerIcon ??
+                                      BitmapDescriptor.defaultMarkerWithHue(
+                                          BitmapDescriptor.hueRed),
+                                  anchor: const Offset(0.5, 0.5),
                                   infoWindow:
                                       const InfoWindow(title: 'Delivery'),
                                 ),
