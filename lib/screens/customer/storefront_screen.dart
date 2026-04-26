@@ -965,6 +965,23 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
           ),
         ),
       ));
+    } else if (page.tiles.length == 1) {
+      // Single tile in a 2-col grid stranded one in the left half. With
+      // exactly one tile, span the full width as a landscape card so the
+      // page doesn't look broken.
+      slivers.add(SliverPadding(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
+        sliver: SliverToBoxAdapter(
+          child: AspectRatio(
+            aspectRatio: 16 / 8.5,
+            child: _ThemedTileCard(
+              tile: page.tiles.first,
+              onTap: () => _onThemedTileTap(page.tiles.first),
+            ),
+          ),
+        ),
+      ));
     } else {
       slivers.add(SliverPadding(
         padding: const EdgeInsets.fromLTRB(
@@ -1650,17 +1667,24 @@ class _ThemedTileCard extends StatelessWidget {
                   ),
                 ),
               ],
+              // FractionallySizedBox + bottomRight alignment gives the
+              // product cutout look from the reference: image floats in
+              // the bottom-right corner with negative space around it
+              // instead of expanding to fill the whole cell.
               Expanded(
-                child: Align(
-                  alignment: Alignment.bottomRight,
-                  child: tile.imageUrl != null && tile.imageUrl!.isNotEmpty
-                      ? Image.network(
+                child: tile.imageUrl != null && tile.imageUrl!.isNotEmpty
+                    ? FractionallySizedBox(
+                        alignment: Alignment.bottomRight,
+                        widthFactor: 0.78,
+                        heightFactor: 1,
+                        child: Image.network(
                           tile.imageUrl!,
                           fit: BoxFit.contain,
+                          alignment: Alignment.bottomRight,
                           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        )
-                      : const SizedBox.shrink(),
-                ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               ),
             ],
           ),
