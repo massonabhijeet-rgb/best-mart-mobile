@@ -51,10 +51,32 @@ class ProductCard extends StatelessWidget {
         width: width,
         height: totalHeight,
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: AppRadius.brMd,
-          border: Border.all(color: AppColors.borderSoft),
-          boxShadow: AppShadow.soft,
+          // Translucent gradient surface so the storefront's drifting
+          // blob backdrop tints through — the visual cue that reads as
+          // "glass" without paying for a per-card BackdropFilter (which
+          // would tank scroll perf with N cards on screen).
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.white.withValues(alpha: 0.92),
+              Colors.white.withValues(alpha: 0.78),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.85),
+            width: 0.8,
+          ),
+          boxShadow: [
+            // Softer, more diffuse shadow than AppShadow.soft so the
+            // card "floats" cleanly against the page blobs.
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -63,16 +85,60 @@ class ProductCard extends StatelessWidget {
               height: imageHeight,
               child: Stack(
                 children: [
+                  // Subtle inner gradient behind the product image —
+                  // very faint, just enough to give the image area a
+                  // sense of depth instead of sitting on a flat panel.
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(AppRadius.lg),
+                        ),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.surfaceSoft.withValues(alpha: 0.5),
+                            Colors.white.withValues(alpha: 0.4),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                   SizedBox(
                     height: imageHeight,
                     width: double.infinity,
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(AppRadius.md),
+                        top: Radius.circular(AppRadius.lg),
                       ),
                       child: GestureDetector(
                         onTap: () => QuickViewSheet.show(context, product),
                         child: _ProductImage(url: product.imageUrl),
+                      ),
+                    ),
+                  ),
+                  // Top-edge "glass" highlight — a 1px white reflection
+                  // strip at the very top, giving the card a faint
+                  // refraction line that reads as glass under direct
+                  // light. Anchored above everything so it's the
+                  // first thing the eye catches.
+                  Positioned(
+                    top: 0,
+                    left: 12,
+                    right: 12,
+                    child: IgnorePointer(
+                      child: Container(
+                        height: 1,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.white.withValues(alpha: 0),
+                              Colors.white.withValues(alpha: 0.9),
+                              Colors.white.withValues(alpha: 0),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -148,7 +214,7 @@ class ProductCard extends StatelessWidget {
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -157,21 +223,23 @@ class ProductCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                         color: AppColors.ink,
-                        height: 1.2,
+                        height: 1.25,
+                        letterSpacing: -0.1,
                       ),
                     ),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: 2),
                     Text(
                       product.unitLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 10,
+                        fontSize: 10.5,
                         color: AppColors.inkFaint,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.1,
                       ),
                     ),
                     const Spacer(),
@@ -184,9 +252,10 @@ class ProductCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w900,
                               color: AppColors.ink,
+                              letterSpacing: -0.3,
                             ),
                           ),
                         ),
@@ -194,15 +263,17 @@ class ProductCard extends StatelessWidget {
                           const SizedBox(width: 4),
                           Flexible(
                             child: Padding(
-                              padding: const EdgeInsets.only(bottom: 1),
+                              padding: const EdgeInsets.only(bottom: 2),
                               child: Text(
                                 '₹${(product.originalPriceCents! / 100).toStringAsFixed(0)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 10.5,
                                   color: AppColors.inkFaint,
                                   decoration: TextDecoration.lineThrough,
+                                  decorationColor: AppColors.inkFaint,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -304,10 +375,23 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
+          // Subtle gradient + soft shadow so badges read like little
+          // pills with depth, not flat coloured rectangles.
+          gradient: LinearGradient(
+            colors: [color, color.withValues(alpha: 0.85)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.35),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Text(
           text,
@@ -328,23 +412,37 @@ class _AddButton extends StatelessWidget {
   const _AddButton({super.key, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
         borderRadius: AppRadius.brSm,
-        child: Container(
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: AppRadius.brSm,
-            border: Border.all(color: AppColors.brandBlue, width: 1.4),
-          ),
-          child: const Text(
-            '+ Add',
-            style: TextStyle(
-              color: AppColors.brandBlue,
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
-              letterSpacing: 0.2,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppRadius.brSm,
+          child: Container(
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              // Translucent white with a brand-blue ring + soft glow
+              // so the button reads as a little glass capsule that
+              // belongs to the brand-blue family.
+              color: Colors.white.withValues(alpha: 0.85),
+              borderRadius: AppRadius.brSm,
+              border: Border.all(color: AppColors.brandBlue, width: 1.4),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.brandBlue.withValues(alpha: 0.18),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Text(
+              '+ Add',
+              style: TextStyle(
+                color: AppColors.brandBlue,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
         ),
