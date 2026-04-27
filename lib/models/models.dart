@@ -86,6 +86,8 @@ class Order {
   final String? assignedRider;
   final int? assignedRiderUserId;
   final String? assignedRiderPhone;
+  // 1-5 stars given by the customer post-delivery; null until rated.
+  final int? riderRating;
   final double? deliveryLatitude;
   final double? deliveryLongitude;
   final String? cancellationReason;
@@ -120,6 +122,7 @@ class Order {
     this.assignedRider,
     this.assignedRiderUserId,
     this.assignedRiderPhone,
+    this.riderRating,
     this.deliveryLatitude,
     this.deliveryLongitude,
     this.cancellationReason,
@@ -152,6 +155,7 @@ class Order {
         assignedRider: j['assignedRider'],
         assignedRiderUserId: j['assignedRiderUserId'],
         assignedRiderPhone: j['assignedRiderPhone'],
+        riderRating: (j['riderRating'] as num?)?.toInt(),
         deliveryLatitude: (j['deliveryLatitude'] as num?)?.toDouble(),
         deliveryLongitude: (j['deliveryLongitude'] as num?)?.toDouble(),
         cancellationReason: j['cancellationReason'] as String?,
@@ -184,6 +188,43 @@ class Order {
         assignedRider: assignedRider ?? this.assignedRider,
         assignedRiderUserId: assignedRiderUserId ?? this.assignedRiderUserId,
         assignedRiderPhone: assignedRiderPhone,
+        riderRating: riderRating,
+        deliveryLatitude: deliveryLatitude,
+        deliveryLongitude: deliveryLongitude,
+        cancellationReason: cancellationReason,
+        deliveryOtp: deliveryOtp,
+        razorpayOrderId: razorpayOrderId,
+        razorpayPaymentId: razorpayPaymentId,
+        paymentStatus: paymentStatus,
+        routePolyline: routePolyline,
+        routeDurationSec: routeDurationSec,
+        routeDistanceM: routeDistanceM,
+        createdDate: createdDate,
+        updatedDate: updatedDate,
+        items: items,
+      );
+
+  /// Optimistic local-only update used right after the customer submits a
+  /// rating, so the rate-rider card flips to its "thanks" state without
+  /// waiting for the next WS broadcast / refetch.
+  Order copyWithRiderRating(int rating) => Order(
+        id: id,
+        publicId: publicId,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        customerEmail: customerEmail,
+        deliveryAddress: deliveryAddress,
+        deliveryNotes: deliveryNotes,
+        deliverySlot: deliverySlot,
+        paymentMethod: paymentMethod,
+        subtotalCents: subtotalCents,
+        deliveryFeeCents: deliveryFeeCents,
+        totalCents: totalCents,
+        status: status,
+        assignedRider: assignedRider,
+        assignedRiderUserId: assignedRiderUserId,
+        assignedRiderPhone: assignedRiderPhone,
+        riderRating: rating,
         deliveryLatitude: deliveryLatitude,
         deliveryLongitude: deliveryLongitude,
         cancellationReason: cancellationReason,

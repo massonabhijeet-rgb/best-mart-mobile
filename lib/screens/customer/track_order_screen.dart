@@ -332,6 +332,28 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
               ),
             ],
 
+            // Rate-rider card — appears only after delivery, hides itself
+            // once a rating has been submitted. The local Order is patched
+            // optimistically so the card disappears immediately on submit.
+            if (_order != null &&
+                _order!.status == 'delivered' &&
+                _order!.assignedRider != null) ...[
+              const SizedBox(height: 12),
+              _RateRiderCard(
+                riderName: _order!.assignedRider!,
+                existingRating: _order!.riderRating,
+                onSubmit: (stars) async {
+                  await ApiService.rateRider(_order!.publicId, stars);
+                  if (!mounted) return;
+                  // Patch the local copy so the card flips to "Thanks!"
+                  // without waiting for the next WS push to land.
+                  setState(() {
+                    _order = _order!.copyWithRiderRating(stars);
+                  });
+                },
+              ),
+            ],
+
             if (_order != null) ...[
               const SizedBox(height: 16),
 
@@ -1015,4 +1037,152 @@ class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderState
           ),
         ),
       );
+}
+
+/// Post-delivery rate-the-rider widget. Tap a star to commit; the parent
+/// patches the local Order with the rating, which flips this card into
+/// its "thanks" state on the next build.
+class _RateRiderCard extends StatefulWidget {
+  final String riderName;
+  final int? existingRating;
+  final Future<void> Function(int stars) onSubmit;
+
+  const _RateRiderCard({
+    required this.riderName,
+    required this.existingRating,
+    required this.onSubmit,
+  });
+
+  @override
+  State<_RateRiderCard> createState() => _RateRiderCardState();
+}
+
+class _RateRiderCardState extends State<_RateRiderCard> {
+  int _hover = 0;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  Widget build(BuildContext context) {
+    final rated = widget.existingRating;
+    if (rated != null) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.brandGreen.withValues(alpha: 0.08),
+          borderRadius: AppRadius.brMd,
+          border: Border.all(
+            color: AppColors.brandGreen.withValues(alpha: 0.25),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle,
+                color: AppColors.brandGreen, size: 24),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'You rated ${widget.riderName} $rated★',
+                    style: const TextStyle(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Thanks for your feedback!',
+                    style: TextStyle(
+                      color: AppColors.inkMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.brMd,
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'How was ${widget.riderName}?',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Tap to rate your delivery',
+            style: TextStyle(color: AppColors.inkMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: List.generate(5, (i) {
+              final star = i + 1;
+              final filled = _hover >= star;
+              return GestureDetector(
+                onTapDown: (_) {
+                  if (_busy) return;
+                  setState(() => _hover = star);
+                },
+                onTap: _busy ? null : () => _submit(star),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Icon(
+                    filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                    color: filled
+                        ? AppColors.brandOrange
+                        : AppColors.inkFaint,
+                    size: 36,
+                  ),
+                ),
+              );
+            }),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: const TextStyle(color: AppColors.danger, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submit(int stars) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.onSubmit(stars);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not submit rating: $e';
+        _hover = 0;
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 }

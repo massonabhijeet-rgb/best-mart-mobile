@@ -124,14 +124,14 @@ class _Section extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+          padding: const EdgeInsets.fromLTRB(16, 22, 16, 12),
           child: Text(
             title,
             style: const TextStyle(
-              fontSize: 17,
+              fontSize: 18,
               fontWeight: FontWeight.w900,
               color: AppColors.ink,
-              letterSpacing: -0.2,
+              letterSpacing: -0.3,
             ),
           ),
         ),
@@ -142,9 +142,9 @@ class _Section extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.78,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 16,
+              childAspectRatio: 0.82,
             ),
             itemCount: items.length,
             itemBuilder: (_, i) =>
@@ -165,25 +165,29 @@ class _CategoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.md),
+      borderRadius: BorderRadius.circular(AppRadius.lg),
       child: Column(
         children: [
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
               color: AppColors.sectionSky,
-              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(
+                color: AppColors.borderSoft,
+                width: 0.6,
+              ),
             ),
             child: AspectRatio(
               aspectRatio: 1,
               child: cat.imageUrl != null && cat.imageUrl!.isNotEmpty
                   ? Padding(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(10),
                       child: CachedNetworkImage(
                         imageUrl: cat.imageUrl!,
                         fit: BoxFit.contain,
-                        memCacheWidth: 200,
-                        memCacheHeight: 200,
+                        memCacheWidth: 220,
+                        memCacheHeight: 220,
                         errorWidget: (_, __, ___) => const Icon(
                           Icons.shopping_basket_outlined,
                           color: AppColors.inkFaint,
@@ -194,12 +198,12 @@ class _CategoryTile extends StatelessWidget {
                       child: Icon(
                         Icons.shopping_basket_outlined,
                         color: AppColors.inkFaint,
-                        size: 28,
+                        size: 30,
                       ),
                     ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             cat.name,
             maxLines: 2,
@@ -209,7 +213,8 @@ class _CategoryTile extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: AppColors.ink,
-              height: 1.2,
+              height: 1.25,
+              letterSpacing: -0.1,
             ),
           ),
         ],

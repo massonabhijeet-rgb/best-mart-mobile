@@ -303,6 +303,24 @@ class ApiService {
         .toList();
   }
 
+  /// Customer rates the rider after delivery (1-5). Backend updates the
+  /// rider's running-average rating in the same transaction so the next
+  /// dispatch's scoring reflects the new value.
+  static Future<({int riderId, double riderRating, int riderRatingCount})>
+      rateRider(String publicId, int rating) async {
+    final data = await _req(
+      'POST',
+      '/orders/$publicId/rate-rider',
+      auth: true,
+      body: {'rating': rating},
+    );
+    return (
+      riderId: (data['riderId'] as num).toInt(),
+      riderRating: (data['riderRating'] as num).toDouble(),
+      riderRatingCount: (data['riderRatingCount'] as num).toInt(),
+    );
+  }
+
   static Future<Order> cancelOrder(String publicId) async {
     final data = await _req('POST', '/orders/$publicId/cancel');
     return Order.fromJson(data['order']);

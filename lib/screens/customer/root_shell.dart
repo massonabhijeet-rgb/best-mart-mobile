@@ -2,12 +2,11 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 
-import '../../providers/home_provider.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/cart_fab.dart';
 import 'categories_screen.dart';
+import 'category_browser_screen.dart';
 import 'order_again_screen.dart';
 import 'storefront_screen.dart';
 
@@ -31,9 +30,12 @@ class _RootShellState extends State<RootShell> {
   }
 
   void _openCategoryOnHome(int categoryId) {
-    // Apply the filter and jump to the Home tab in one motion.
-    context.read<HomeProvider>().setCategory(categoryId);
-    _go(0);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            CategoryBrowserScreen(parentCategoryId: categoryId),
+      ),
+    );
   }
 
   @override

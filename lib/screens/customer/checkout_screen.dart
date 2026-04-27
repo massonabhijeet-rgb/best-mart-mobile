@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -64,20 +65,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     },
     {
       'value': 'razorpay',
-      'label': 'Card / Netbanking / Other UPI',
-      'sub': 'Pay online via Razorpay',
-      'icon': Icons.lock_outline,
-    },
-    {
-      'value': 'upi',
-      'label': 'UPI on Delivery',
-      'sub': 'Pay the rider via UPI QR',
-      'icon': Icons.qr_code_2,
-    },
-    {
-      'value': 'card',
-      'label': 'Credit / Debit Card on Delivery',
-      'sub': 'Visa, Mastercard, RuPay',
+      'label': 'Debit / Credit Card',
+      'sub': 'Visa, Mastercard, RuPay · secure',
       'icon': Icons.credit_card,
     },
     {
@@ -197,17 +186,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return head.isEmpty ? line : head;
   }
 
-  // Groups used in the payment bottom sheet. Order within each group mirrors
-  // the `_payMethods` master list so defaults stay stable.
-  static const List<String> _payOnlineValues = [
+  // Order mirrors the `_payMethods` master list so defaults stay stable.
+  static const List<String> _paymentValues = [
     'phonepe',
     'gpay',
     'paytm',
     'razorpay',
-  ];
-  static const List<String> _payOnDeliveryValues = [
-    'upi',
-    'card',
     'cash_on_delivery',
   ];
 
@@ -216,99 +200,146 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final picked = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.pageBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.32),
       builder: (sheetContext) {
-        final onlineTiles = _payMethods
-            .where((m) => _payOnlineValues.contains(m['value']))
+        final tiles = _payMethods
+            .where((m) => _paymentValues.contains(m['value']))
             .toList();
-        final onDeliveryTiles = _payMethods
-            .where((m) => _payOnDeliveryValues.contains(m['value']))
-            .toList();
-        Widget buildGroup(String title, List<Map<String, dynamic>> tiles) {
-          return Container(
-            margin: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.borderSoft),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
-                      fontSize: 13,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
-                for (final p in tiles)
-                  _PaymentTile(
-                    label: p['label'] as String,
-                    subtitle: p['sub'] as String,
-                    icon: p['icon'] as IconData,
-                    iconAsset: p['iconAsset'] as String?,
-                    selected: _payment == p['value'],
-                    onTap: () =>
-                        Navigator.of(sheetContext).pop(p['value'] as String),
-                  ),
+        final group = Container(
+          margin: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withValues(alpha: 0.55),
+                Colors.white.withValues(alpha: 0.30),
               ],
             ),
-          );
-        }
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.65),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final p in tiles)
+                _PaymentTile(
+                  label: p['label'] as String,
+                  subtitle: p['sub'] as String,
+                  icon: p['icon'] as IconData,
+                  iconAsset: p['iconAsset'] as String?,
+                  selected: _payment == p['value'],
+                  onTap: () =>
+                      Navigator.of(sheetContext).pop(p['value'] as String),
+                ),
+            ],
+          ),
+        );
 
         return SafeArea(
+          top: false,
           child: DraggableScrollableSheet(
             initialChildSize: 0.7,
             minChildSize: 0.4,
             maxChildSize: 0.9,
             expand: false,
-            builder: (_, scrollCtrl) => Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
-                  child: Row(
+            builder: (_, scrollCtrl) => ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.82),
+                        Colors.white.withValues(alpha: 0.62),
+                      ],
+                    ),
+                    border: Border(
+                      top: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: Column(
                     children: [
-                      const Expanded(
-                        child: Text(
-                          'Select Payment Method',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                            color: AppColors.ink,
-                          ),
+                      Container(
+                        margin: const EdgeInsets.only(top: 10, bottom: 4),
+                        width: 44,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.inkFaint.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close,
-                            color: AppColors.inkMuted),
-                        onPressed: () =>
-                            Navigator.of(sheetContext).pop(),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 6, 8, 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Text(
+                                    'Payment',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 20,
+                                      color: AppColors.ink,
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Choose how you’d like to pay',
+                                    style: TextStyle(
+                                      color: AppColors.inkMuted,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded,
+                                  color: AppColors.inkMuted),
+                              onPressed: () =>
+                                  Navigator.of(sheetContext).pop(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView(
+                          controller: scrollCtrl,
+                          padding: const EdgeInsets.only(top: 4, bottom: 24),
+                          children: [group],
+                        ),
                       ),
                     ],
                   ),
                 ),
-                Expanded(
-                  child: ListView(
-                    controller: scrollCtrl,
-                    padding: const EdgeInsets.only(bottom: 16),
-                    children: [
-                      buildGroup('Pay online', onlineTiles),
-                      buildGroup('Pay on delivery', onDeliveryTiles),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
@@ -539,6 +570,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             },
           },
           'sequence': ['block.upi_preferred'],
+          'preferences': {'show_default_blocks': false},
+        },
+      };
+    } else {
+      // "Debit / Credit Card" tile: lock Razorpay to cards only — no UPI,
+      // netbanking, wallets, EMI, or pay-later inside the sheet.
+      options['method'] = {
+        'card': true,
+        'upi': false,
+        'netbanking': false,
+        'wallet': false,
+        'emi': false,
+        'paylater': false,
+      };
+      options['config'] = {
+        'display': {
+          'blocks': {
+            'card_only': {
+              'name': 'Pay with Debit / Credit Card',
+              'instruments': [
+                {'method': 'card'},
+              ],
+            },
+          },
+          'sequence': ['block.card_only'],
           'preferences': {'show_default_blocks': false},
         },
       };
@@ -1190,99 +1246,192 @@ class _PaymentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppRadius.brMd,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: selected
-                  ? AppColors.brandBlue.withValues(alpha: 0.06)
-                  : AppColors.surface,
-              borderRadius: AppRadius.brMd,
-              border: Border.all(
-                color: selected ? AppColors.brandBlue : AppColors.borderSoft,
-                width: selected ? 1.6 : 1,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOut,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: selected
+                      ? [
+                          AppColors.brandBlue.withValues(alpha: 0.22),
+                          AppColors.brandBlue.withValues(alpha: 0.08),
+                        ]
+                      : [
+                          Colors.white.withValues(alpha: 0.55),
+                          Colors.white.withValues(alpha: 0.28),
+                        ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: selected
+                      ? AppColors.brandBlue.withValues(alpha: 0.55)
+                      : Colors.white.withValues(alpha: 0.55),
+                  width: selected ? 1.4 : 1,
+                ),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color:
+                              AppColors.brandBlue.withValues(alpha: 0.18),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
               ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: iconAsset != null
-                        ? AppColors.surface
-                        : (selected
-                            ? AppColors.brandBlue
-                            : AppColors.brandBlue.withValues(alpha: 0.1)),
-                    borderRadius: AppRadius.brSm,
-                    border: iconAsset != null
-                        ? Border.all(color: AppColors.borderSoft)
-                        : null,
-                  ),
-                  child: iconAsset != null
-                      ? ClipRRect(
-                          borderRadius: AppRadius.brSm,
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: Image.asset(
-                              iconAsset!,
-                              fit: BoxFit.contain,
-                              cacheWidth: 128,
-                              errorBuilder: (_, __, ___) => Icon(
-                                icon,
-                                color: AppColors.brandBlue,
-                                size: 20,
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: iconAsset != null
+                            ? [
+                                Colors.white.withValues(alpha: 0.95),
+                                Colors.white.withValues(alpha: 0.75),
+                              ]
+                            : selected
+                                ? [
+                                    AppColors.brandBlue,
+                                    AppColors.brandBlueDark,
+                                  ]
+                                : [
+                                    Colors.white.withValues(alpha: 0.7),
+                                    Colors.white.withValues(alpha: 0.45),
+                                  ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        width: 0.8,
+                      ),
+                      boxShadow: selected && iconAsset == null
+                          ? [
+                              BoxShadow(
+                                color: AppColors.brandBlue
+                                    .withValues(alpha: 0.35),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: iconAsset != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(5),
+                              child: Image.asset(
+                                iconAsset!,
+                                fit: BoxFit.contain,
+                                cacheWidth: 128,
+                                errorBuilder: (_, __, ___) => Icon(
+                                  icon,
+                                  color: AppColors.brandBlue,
+                                  size: 20,
+                                ),
                               ),
                             ),
+                          )
+                        : Icon(
+                            icon,
+                            color: selected
+                                ? Colors.white
+                                : AppColors.brandBlueDark,
+                            size: 20,
                           ),
-                        )
-                      : Icon(
-                          icon,
-                          color:
-                              selected ? Colors.white : AppColors.brandBlue,
-                          size: 20,
-                        ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                          color: selected
-                              ? AppColors.brandBlueDark
-                              : AppColors.ink,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: AppColors.inkFaint,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
                   ),
-                ),
-                Icon(
-                  selected ? Icons.check_circle : Icons.radio_button_unchecked,
-                  color: selected ? AppColors.brandBlue : AppColors.inkFaint,
-                  size: 20,
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13.5,
+                            letterSpacing: -0.1,
+                            color: selected
+                                ? AppColors.brandBlueDark
+                                : AppColors.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: selected
+                                ? AppColors.brandBlueDark
+                                    .withValues(alpha: 0.75)
+                                : AppColors.inkMuted,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: selected
+                          ? LinearGradient(
+                              colors: [
+                                AppColors.brandBlue,
+                                AppColors.brandBlueDark,
+                              ],
+                            )
+                          : null,
+                      color: selected
+                          ? null
+                          : Colors.white.withValues(alpha: 0.6),
+                      border: Border.all(
+                        color: selected
+                            ? Colors.white.withValues(alpha: 0.9)
+                            : AppColors.inkFaint.withValues(alpha: 0.6),
+                        width: 1.2,
+                      ),
+                      boxShadow: selected
+                          ? [
+                              BoxShadow(
+                                color: AppColors.brandBlue
+                                    .withValues(alpha: 0.35),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: selected
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          )
+                        : null,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
