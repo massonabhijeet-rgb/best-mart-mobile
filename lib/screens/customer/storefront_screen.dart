@@ -283,53 +283,32 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.pageBg,
-      extendBodyBehindAppBar: true,
-      appBar: _appBar(),
+      // No Scaffold appBar — the BestMart logo + profile row is now
+      // an in-flow sliver so it scrolls away with content. Only the
+      // search + categories below it stay pinned. SafeArea wraps the
+      // body so the first sliver isn't covered by the status bar.
       body: LiquidGlassBackground(
-        // Manually inset for status bar + AppBar height because the
-        // body extends behind the frosted-glass bar. The drifting
-        // blob layer renders behind everything — search bar, app bar,
-        // section cards on top pick it up through their own blur.
-        child: Column(
-          children: [
-            SizedBox(
-              height:
-                  MediaQuery.of(context).padding.top + kToolbarHeight,
-            ),
-            if (shop.isClosed) _ShopClosedBanner(message: shop.closedMessage),
-            Expanded(child: _body(home)),
-          ],
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              if (shop.isClosed) _ShopClosedBanner(message: shop.closedMessage),
+              Expanded(child: _body(home)),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  PreferredSizeWidget _appBar() => AppBar(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        flexibleSpace: ClipRect(
-          child: BackdropFilter(
-            // Sigma 28 + lower-opacity tint so the drifting blob
-            // colors come through more strongly — that's the cue
-            // that reads as "real" glass, not just a flat surface.
-            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.48),
-                border: const Border(
-                  bottom: BorderSide(
-                    color: Color(0x14101828),
-                    width: 0.5,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        titleSpacing: AppSpacing.md,
-        title: Row(
+  /// In-flow top bar: BestMart logo + name on the left, profile avatar
+  /// on the right. Rendered as a regular sliver so it scrolls away with
+  /// content — leaving the pinned search + chips as the only thing
+  /// glued to the top once the user starts scrolling.
+  Widget _topBar() => Padding(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
+        child: Row(
           children: [
             ClipRRect(
               borderRadius: AppRadius.brSm,
@@ -352,12 +331,10 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
                 letterSpacing: -0.2,
               ),
             ),
+            const Spacer(),
+            const _ProfileAvatarButton(),
           ],
         ),
-        actions: [
-          const _ProfileAvatarButton(),
-          const SizedBox(width: AppSpacing.md),
-        ],
       );
 
   Widget _body(HomeProvider home) {
@@ -372,6 +349,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       child: CustomScrollView(
         controller: _scrollCtrl,
         slivers: [
+          SliverToBoxAdapter(child: _topBar()),
           const SliverToBoxAdapter(child: _DeliveryHeader()),
           const SliverToBoxAdapter(child: _ContextBanner()),
           // Search + categories pinned at the top — always visible
