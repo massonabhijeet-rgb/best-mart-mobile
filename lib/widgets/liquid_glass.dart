@@ -2,8 +2,6 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
-import '../theme/tokens.dart';
-
 /// Static, professional storefront backdrop: a soft top-to-bottom
 /// gradient (light brand-blue tint fading to white). Replaces the
 /// earlier drifting "liquid blob" animation, which read as the
@@ -36,7 +34,7 @@ class LiquidGlassBackground extends StatelessWidget {
           ),
           child: SizedBox.expand(),
         ),
-        widget.child,
+        child,
       ],
     );
   }
