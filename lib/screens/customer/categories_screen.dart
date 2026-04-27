@@ -42,48 +42,33 @@ class CategoriesScreen extends StatelessWidget {
   }
 
   Widget _buildBody(List<Category> all) {
-    // Split top-level vs children. A "top-level" is anything with
-    // parentId == null. Anything else is a sub-category.
-    final byParent = <int, List<Category>>{};
-    final tops = <Category>[];
-    for (final c in all) {
-      if (c.parentId == null) {
-        tops.add(c);
-      } else {
-        byParent.putIfAbsent(c.parentId!, () => []).add(c);
-      }
-    }
-    tops.sort((a, b) => a.name.compareTo(b.name));
+    // Render every top-level category (parentId == null) as a tile in a
+    // single 4-col grid. Tapping a tile pushes the browser screen — if
+    // the category has children they'll show as the sidebar, otherwise
+    // the browser just renders the product grid for that category.
+    //
+    // Sub-categories used to be rendered here as tiles (under their
+    // parent's name as a section header); that meant parent categories
+    // like "Baby Care" were invisible — only its children "Diapers &
+    // Wipes" and "Feeding Essentials" appeared. The Blinkit-style flow
+    // surfaces the parent as the entry point and reveals children only
+    // after the user opts in to that department.
+    final tops = all.where((c) => c.parentId == null).toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
 
-    // Tops with children get a header + sub-grid; tops without
-    // children render as their own tile in a "More" section so the
-    // user can still discover/filter on them.
-    final sections = <Widget>[];
-    final loners = <Category>[];
-    for (final top in tops) {
-      final children = (byParent[top.id] ?? []);
-      if (children.isEmpty) {
-        loners.add(top);
-        continue;
-      }
-      children.sort((a, b) => a.name.compareTo(b.name));
-      sections.add(_Section(
-        title: top.name,
-        items: children,
-        onTap: onCategoryTap,
-      ));
-    }
-    if (loners.isNotEmpty) {
-      sections.add(_Section(
-        title: 'More',
-        items: loners,
-        onTap: onCategoryTap,
-      ));
-    }
+    if (tops.isEmpty) return const _LoadingOrEmpty();
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
-      children: sections,
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 28),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 16,
+        childAspectRatio: 0.82,
+      ),
+      itemCount: tops.length,
+      itemBuilder: (_, i) =>
+          _CategoryTile(cat: tops[i], onTap: () => onCategoryTap(tops[i].id)),
     );
   }
 }
@@ -104,54 +89,6 @@ class _LoadingOrEmpty extends StatelessWidget {
           style: TextStyle(color: AppColors.inkFaint, fontSize: 14),
         ),
       ),
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  final String title;
-  final List<Category> items;
-  final void Function(int) onTap;
-  const _Section({
-    required this.title,
-    required this.items,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 22, 16, 12),
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: AppColors.ink,
-              letterSpacing: -0.3,
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.82,
-            ),
-            itemCount: items.length,
-            itemBuilder: (_, i) =>
-                _CategoryTile(cat: items[i], onTap: () => onTap(items[i].id)),
-          ),
-        ),
-      ],
     );
   }
 }

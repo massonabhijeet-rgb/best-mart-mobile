@@ -145,12 +145,14 @@ class _CategoryBrowserScreenState extends State<CategoryBrowserScreen> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (subs.isNotEmpty)
-            _Sidebar(
-              subs: subs,
-              selectedSubId: _selectedSubId,
-              onSelect: _selectSub,
-            ),
+          // Sidebar is shown on EVERY category page — when there are no
+          // sub-categories it just contains the "All" pill, keeping the
+          // layout consistent across every department the user opens.
+          _Sidebar(
+            subs: subs,
+            selectedSubId: _selectedSubId,
+            onSelect: _selectSub,
+          ),
           Expanded(
             child: _MainArea(
               parent: parent,
@@ -388,13 +390,17 @@ class _MainArea extends StatelessWidget {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
             sliver: SliverGrid.builder(
+              // mainAxisExtent pins each tile's height to the card's
+              // actual rendered size. Using `childAspectRatio` instead
+              // stretched tiles to fit the (wider-than-storefront) 2-col
+              // grid, leaving 50-80px of empty white space below the
+              // product name.
               gridDelegate:
                   const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 10,
-                mainAxisSpacing: 14,
-                childAspectRatio:
-                    150 / ProductCard.totalHeight, // matches card layout
+                mainAxisSpacing: 12,
+                mainAxisExtent: 230,
               ),
               itemCount: products.length,
               itemBuilder: (_, i) => ProductCard(
