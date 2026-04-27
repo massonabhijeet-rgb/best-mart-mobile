@@ -33,8 +33,14 @@ dev_dependencies:
 
 flutter_launcher_icons:
   ios: true
-  android: false
+  android: true
   image_path: "assets/icon/app_icon.png"
+  # Adaptive icon (Android 8.0+): the launcher fills the safe-zone
+  # circle/squircle with this background color and overlays the
+  # foreground image. Using the same source for foreground gives us
+  # a sane default until we have a proper transparent foreground PNG.
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
   remove_alpha_ios: true
 
 flutter:
