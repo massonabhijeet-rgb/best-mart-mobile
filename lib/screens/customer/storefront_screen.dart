@@ -374,14 +374,12 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
         slivers: [
           const SliverToBoxAdapter(child: _DeliveryHeader()),
           const SliverToBoxAdapter(child: _ContextBanner()),
-          // Search + categories ride together in a floating header:
-          // they slide off-screen as the user scrolls down to maximise
-          // content area, and slide back into view the moment the user
-          // scrolls up. Pinned would waste real estate; pure scroll-
-          // away makes them hard to reach mid-list.
+          // Search + categories pinned at the top — always visible
+          // regardless of scroll position so the user can hop into a
+          // category or search field at any time without scrolling
+          // back to the top.
           SliverPersistentHeader(
-            pinned: false,
-            floating: true,
+            pinned: true,
             delegate: _FloatingSearchAndChipsDelegate(
               searchBar: _searchBar(),
               chipsRow: _categoryChips(home),
