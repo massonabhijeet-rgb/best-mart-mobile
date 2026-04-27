@@ -374,10 +374,17 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
         slivers: [
           const SliverToBoxAdapter(child: _DeliveryHeader()),
           const SliverToBoxAdapter(child: _ContextBanner()),
+          // Search + categories ride together in a floating header:
+          // they slide off-screen as the user scrolls down to maximise
+          // content area, and slide back into view the moment the user
+          // scrolls up. Pinned would waste real estate; pure scroll-
+          // away makes them hard to reach mid-list.
           SliverPersistentHeader(
-            pinned: true,
-            delegate: _PinnedSearchBarDelegate(
-              child: _searchBar(),
+            pinned: false,
+            floating: true,
+            delegate: _FloatingSearchAndChipsDelegate(
+              searchBar: _searchBar(),
+              chipsRow: _categoryChips(home),
             ),
           ),
           if (_searchFocus.hasFocus &&
@@ -388,8 +395,6 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
               _searchCtrl.text.trim().isNotEmpty &&
               _suggestions.isNotEmpty)
             SliverToBoxAdapter(child: _suggestionList()),
-          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
-          SliverToBoxAdapter(child: _categoryChips(home)),
           if (_selectedThemedPage != null)
             ..._buildThemedPageSlivers(_selectedThemedPage!)
           else if (home.isFiltered)
@@ -1639,10 +1644,23 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
 // transparent at rest (so the bar sits naturally on the gradient) and
 // fades to a solid white surface with a hairline bottom border once
 // pinned — keeps the input readable without piling on shadows or blur.
-class _PinnedSearchBarDelegate extends SliverPersistentHeaderDelegate {
-  static const double _height = 64;
-  final Widget child;
-  _PinnedSearchBarDelegate({required this.child});
+/// Combined header that holds the search bar + category chip row.
+/// Used with `floating: true` (no `pinned`) so the entire block slides
+/// off-screen as the user scrolls down and snaps back the moment they
+/// scroll up — same behaviour Zepto / Blinkit use.
+class _FloatingSearchAndChipsDelegate extends SliverPersistentHeaderDelegate {
+  // Search field + its outer padding + chip row + a small spacer.
+  static const double _searchBlock = 64; // matches _searchBar's render height
+  static const double _chipsBlock = 80;  // matches _categoryChips height
+  static const double _gap = 6;
+  static const double _height = _searchBlock + _gap + _chipsBlock;
+
+  final Widget searchBar;
+  final Widget chipsRow;
+  _FloatingSearchAndChipsDelegate({
+    required this.searchBar,
+    required this.chipsRow,
+  });
 
   @override
   double get minExtent => _height;
@@ -1650,26 +1668,42 @@ class _PinnedSearchBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => _height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    final pinned = shrinkOffset > 0 || overlapsContent;
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    final overlapping = shrinkOffset > 0 || overlapsContent;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       curve: Curves.easeOut,
       decoration: BoxDecoration(
-        color: pinned ? AppColors.surface : Colors.transparent,
-        border: pinned
+        // Slight surface tint when the header is overlapping content
+        // so the chips/search don't bleed visually into rails behind.
+        color: overlapping
+            ? AppColors.surface.withValues(alpha: 0.92)
+            : Colors.transparent,
+        border: overlapping
             ? const Border(
                 bottom: BorderSide(color: AppColors.borderSoft, width: 0.5),
               )
             : null,
       ),
-      child: child,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(height: _searchBlock, child: searchBar),
+          const SizedBox(height: _gap),
+          SizedBox(height: _chipsBlock, child: chipsRow),
+        ],
+      ),
     );
   }
 
   @override
-  bool shouldRebuild(covariant _PinnedSearchBarDelegate oldDelegate) =>
-      child != oldDelegate.child;
+  bool shouldRebuild(covariant _FloatingSearchAndChipsDelegate old) =>
+      searchBar != old.searchBar || chipsRow != old.chipsRow;
 }
 
 class _ShopClosedBanner extends StatelessWidget {
