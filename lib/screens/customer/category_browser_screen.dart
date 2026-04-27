@@ -35,7 +35,21 @@ class _CategoryBrowserScreenState extends State<CategoryBrowserScreen> {
   void initState() {
     super.initState();
     _gridScroll.addListener(_onScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetch(reset: true));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Auto-select the first sub-category on first paint so the
+      // product grid is never empty under a sidebar that has nothing
+      // selected. (No "All" entry in the sidebar — sub-categories only.)
+      final home = context.read<HomeProvider>();
+      final subs = home.categories
+          .where((c) => c.parentId == widget.parentCategoryId)
+          .toList()
+        ..sort((a, b) => a.name.compareTo(b.name));
+      if (subs.isNotEmpty) {
+        _selectedSubId = subs.first.id;
+      }
+      _fetch(reset: true);
+    });
   }
 
   @override
@@ -198,12 +212,6 @@ class _Sidebar extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: 6),
         children: [
-          _SidebarItem(
-            label: 'All',
-            imageUrl: null,
-            selected: selectedSubId == null,
-            onTap: () => onSelect(null),
-          ),
           for (final s in subs)
             _SidebarItem(
               label: s.name,
