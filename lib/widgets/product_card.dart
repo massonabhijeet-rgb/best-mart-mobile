@@ -8,18 +8,23 @@ import '../screens/customer/cart_provider.dart';
 import '../theme/tokens.dart';
 import 'quick_view_sheet.dart';
 
+/// Zepto/Blinkit-style product card: flat white surface with thin border,
+/// image area on top with a weight chip at the bottom-left and a floating
+/// ADD button at the bottom-right (overlapping the image / content
+/// boundary), and a price-first content section below — price big and
+/// bold, discount % in brand-blue, product name 2 lines below.
 class ProductCard extends StatelessWidget {
   final Product product;
   final double width;
 
-  static const double imageHeight = 100;
-  static const double contentHeight = 150;
+  static const double imageHeight = 130;
+  static const double contentHeight = 130;
   static const double totalHeight = imageHeight + contentHeight;
 
   const ProductCard({
     super.key,
     required this.product,
-    this.width = 110,
+    this.width = 150,
   });
 
   bool get _cleanBadge {
@@ -49,149 +54,79 @@ class ProductCard extends StatelessWidget {
       opacity: outOfStock ? 0.55 : 1,
       child: Container(
         width: width,
-        height: totalHeight,
         decoration: BoxDecoration(
-          // Translucent gradient surface so the storefront's drifting
-          // blob backdrop tints through — the visual cue that reads as
-          // "glass" without paying for a per-card BackdropFilter (which
-          // would tank scroll perf with N cards on screen).
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.white.withValues(alpha: 0.92),
-              Colors.white.withValues(alpha: 0.78),
-            ],
-          ),
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.85),
+            color: AppColors.borderSoft,
             width: 0.8,
           ),
           boxShadow: [
-            // Softer, more diffuse shadow than AppShadow.soft so the
-            // card "floats" cleanly against the page blobs.
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
+            // ── Image area with weight chip + floating ADD button ──
             SizedBox(
               height: imageHeight,
               child: Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  // Subtle inner gradient behind the product image —
-                  // very faint, just enough to give the image area a
-                  // sense of depth instead of sitting on a flat panel.
+                  // Subtle inner background so the cutout image has
+                  // depth instead of sitting on a flat panel.
                   Positioned.fill(
                     child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.vertical(
+                      decoration: const BoxDecoration(
+                        color: AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.vertical(
                           top: Radius.circular(AppRadius.lg),
                         ),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppColors.surfaceSoft.withValues(alpha: 0.5),
-                            Colors.white.withValues(alpha: 0.4),
-                          ],
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        child: GestureDetector(
+                          onTap: () => QuickViewSheet.show(context, product),
+                          child: _ProductImage(url: product.imageUrl),
                         ),
                       ),
                     ),
                   ),
-                  SizedBox(
-                    height: imageHeight,
-                    width: double.infinity,
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(AppRadius.lg),
-                      ),
-                      child: GestureDetector(
-                        onTap: () => QuickViewSheet.show(context, product),
-                        child: _ProductImage(url: product.imageUrl),
-                      ),
-                    ),
-                  ),
-                  // Top-edge "glass" highlight — a 1px white reflection
-                  // strip at the very top, giving the card a faint
-                  // refraction line that reads as glass under direct
-                  // light. Anchored above everything so it's the
-                  // first thing the eye catches.
-                  Positioned(
-                    top: 0,
-                    left: 12,
-                    right: 12,
-                    child: IgnorePointer(
-                      child: Container(
-                        height: 1,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.white.withValues(alpha: 0),
-                              Colors.white.withValues(alpha: 0.9),
-                              Colors.white.withValues(alpha: 0),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (hasDiscount && discountPct > 0)
-                    Positioned(
-                      top: 6,
-                      right: 6,
-                      child: _Badge(
-                        text: '$discountPct% OFF',
-                        color: AppColors.brandGreen,
-                      ),
-                    ),
+                  // Custom badge top-left (if it's a clean short string).
                   if (_cleanBadge)
                     Positioned(
                       top: 6,
                       left: 6,
-                      right: hasDiscount && discountPct > 0 ? 72 : 6,
                       child: _Badge(
                         text: product.badge!,
                         color: AppColors.brandOrange,
                       ),
                     ),
-                  if (lowStock)
-                    Positioned(
-                      bottom: 6,
-                      right: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.danger,
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.full),
-                        ),
-                        child: Text(
-                          'Only ${product.stockQuantity} left',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                    ),
+                  // Out-of-stock overlay covers the image entirely.
                   if (outOfStock)
                     Positioned.fill(
                       child: Container(
                         alignment: Alignment.center,
-                        color: Colors.black.withValues(alpha: 0.35),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.32),
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(AppRadius.lg),
+                          ),
+                        ),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: AppColors.danger,
                             borderRadius:
@@ -209,83 +144,75 @@ class ProductCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
-                        height: 1.25,
-                        letterSpacing: -0.1,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      product.unitLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        color: AppColors.inkFaint,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.1,
-                      ),
-                    ),
-                    const Spacer(),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            '₹${(product.priceCents / 100).toStringAsFixed(0)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.ink,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                        ),
-                        if (hasDiscount) ...[
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 2),
-                              child: Text(
-                                '₹${(product.originalPriceCents! / 100).toStringAsFixed(0)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  color: AppColors.inkFaint,
-                                  decoration: TextDecoration.lineThrough,
-                                  decorationColor: AppColors.inkFaint,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
+                  // Weight chip pinned bottom-left of the image.
+                  Positioned(
+                    left: 8,
+                    bottom: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius:
+                            BorderRadius.circular(AppRadius.full),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
                           ),
                         ],
-                      ],
+                      ),
+                      child: Text(
+                        product.unitLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      height: 28,
+                  ),
+                  // Low-stock chip below the weight chip — only shown
+                  // when stock is 1-5. Doesn't fight the ADD button
+                  // because we anchor it to the LEFT of the image.
+                  if (lowStock)
+                    Positioned(
+                      left: 8,
+                      bottom: 36,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger,
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.full),
+                        ),
+                        child: Text(
+                          '${product.stockQuantity} left',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Floating ADD button — overlaps the bottom-right of
+                  // the image area. Negative bottom anchor so it
+                  // straddles the image / content boundary like the
+                  // reference design.
+                  Positioned(
+                    right: 8,
+                    bottom: -12,
+                    child: SizedBox(
+                      width: 70,
+                      height: 32,
                       child: outOfStock
-                          ? _DisabledButton()
+                          ? const _DisabledButton()
                           : AnimatedSwitcher(
                               duration: const Duration(milliseconds: 180),
                               switchInCurve: Curves.easeOutBack,
@@ -316,8 +243,73 @@ class ProductCard extends StatelessWidget {
                                     ),
                             ),
                     ),
+                  ),
+                ],
+              ),
+            ),
+            // ── Content area: price-first, then discount, then name ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 18, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '₹${(product.priceCents / 100).toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.ink,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      if (hasDiscount) ...[
+                        const SizedBox(width: 6),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            '₹${(product.originalPriceCents! / 100).toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.inkFaint,
+                              decoration: TextDecoration.lineThrough,
+                              decorationColor: AppColors.inkFaint,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (hasDiscount && discountPct > 0) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '$discountPct% OFF on MRP',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.brandBlue,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
                   ],
-                ),
+                  const SizedBox(height: 4),
+                  Text(
+                    product.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.inkMuted,
+                      height: 1.3,
+                      letterSpacing: -0.1,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -327,17 +319,13 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-
 class _ProductImage extends StatelessWidget {
   final String? url;
-  const _ProductImage({this.url});
+  const _ProductImage({required this.url});
 
   @override
   Widget build(BuildContext context) {
     if (url == null || url!.isEmpty) return _fallback();
-    // BoxFit.contain so tall product photos (bottles, standing packets,
-    // etc.) aren't cropped at the head — the surrounding gradient
-    // backdrop fills any letter/pillar-box space cleanly.
     return CachedNetworkImage(
       imageUrl: url!,
       fit: BoxFit.contain,
@@ -380,8 +368,6 @@ class _Badge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
-          // Subtle gradient + soft shadow so badges read like little
-          // pills with depth, not flat coloured rectangles.
           gradient: LinearGradient(
             colors: [color, color.withValues(alpha: 0.85)],
             begin: Alignment.topLeft,
@@ -424,27 +410,25 @@ class _AddButton extends StatelessWidget {
           child: Container(
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              // Translucent white with a brand-blue ring + soft glow
-              // so the button reads as a little glass capsule that
-              // belongs to the brand-blue family.
-              color: Colors.white.withValues(alpha: 0.85),
+              color: AppColors.surface,
               borderRadius: AppRadius.brSm,
-              border: Border.all(color: AppColors.brandBlue, width: 1.4),
+              border:
+                  Border.all(color: AppColors.brandGreen, width: 1.4),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.brandBlue.withValues(alpha: 0.18),
-                  blurRadius: 8,
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
               ],
             ),
             child: const Text(
-              '+ Add',
+              'ADD',
               style: TextStyle(
-                color: AppColors.brandBlue,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-                letterSpacing: 0.2,
+                color: AppColors.brandGreen,
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                letterSpacing: 0.5,
               ),
             ),
           ),
@@ -453,6 +437,8 @@ class _AddButton extends StatelessWidget {
 }
 
 class _DisabledButton extends StatelessWidget {
+  const _DisabledButton();
+
   @override
   Widget build(BuildContext context) => Container(
         alignment: Alignment.center,
@@ -462,11 +448,12 @@ class _DisabledButton extends StatelessWidget {
           border: Border.all(color: AppColors.borderSoft),
         ),
         child: const Text(
-          'Unavailable',
+          'Notify',
           style: TextStyle(
-            color: AppColors.inkFaint,
-            fontWeight: FontWeight.w700,
+            color: AppColors.inkMuted,
+            fontWeight: FontWeight.w800,
             fontSize: 11,
+            letterSpacing: 0.3,
           ),
         ),
       );
@@ -486,51 +473,53 @@ class _QtyStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: AppColors.brandBlue,
+          color: AppColors.brandGreen,
           borderRadius: AppRadius.brSm,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.brandGreen.withValues(alpha: 0.32),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            _StepBtn(icon: Icons.remove, onTap: onMinus),
             Expanded(
-              child: Center(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 160),
-                  transitionBuilder: (c, a) => ScaleTransition(
-                    scale: a,
-                    child: c,
-                  ),
-                  child: Text(
-                    '$qty',
-                    key: ValueKey(qty),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                    ),
-                  ),
+              child: InkWell(
+                onTap: onMinus,
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(AppRadius.sm),
+                ),
+                child: const Icon(
+                  Icons.remove,
+                  color: Colors.white,
+                  size: 16,
                 ),
               ),
             ),
-            _StepBtn(icon: Icons.add, onTap: onPlus),
+            Text(
+              '$qty',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            Expanded(
+              child: InkWell(
+                onTap: onPlus,
+                borderRadius: const BorderRadius.horizontal(
+                  right: Radius.circular(AppRadius.sm),
+                ),
+                child: const Icon(
+                  Icons.add,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ),
           ],
-        ),
-      );
-}
-
-class _StepBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _StepBtn({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.brSm,
-        child: SizedBox(
-          width: 28,
-          height: 28,
-          child: Icon(icon, color: Colors.white, size: 16),
         ),
       );
 }
