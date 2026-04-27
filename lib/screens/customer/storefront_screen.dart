@@ -1344,6 +1344,103 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     });
   }
 
+  /// Hero strip + sub-category tile grid rendered above the filtered
+  /// products list when the user taps a parent category that has
+  /// children. Each tile shows the child's image_url + name, and tapping
+  /// a tile drills further by setting that child as the category filter.
+  List<Widget> _buildSubCategorySlivers(
+    Category parent,
+    List<Category> children,
+    HomeProvider home,
+  ) {
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
+        sliver: SliverToBoxAdapter(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md, 12, AppSpacing.md, 12),
+            decoration: BoxDecoration(
+              color: AppColors.sectionSky,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: AppColors.borderSoft),
+            ),
+            child: Row(
+              children: [
+                if (parent.imageUrl != null && parent.imageUrl!.isNotEmpty) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    child: CachedNetworkImage(
+                      imageUrl: parent.imageUrl!,
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 132,
+                      memCacheHeight: 132,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        parent.name,
+                        style: const TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${children.length} sub-categories',
+                        style: const TextStyle(
+                          color: AppColors.inkMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.sm),
+        sliver: SliverGrid.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: AppSpacing.md,
+            mainAxisSpacing: AppSpacing.md,
+            childAspectRatio: 2.6,
+          ),
+          itemCount: children.length,
+          itemBuilder: (_, i) => _SubCategoryTile(
+            category: children[i],
+            onTap: () {
+              HapticFeedback.selectionClick();
+              home.setCategory(children[i].id);
+              if (_scrollCtrl.hasClients) {
+                _scrollCtrl.animateTo(0,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut);
+              }
+            },
+          ),
+        ),
+      ),
+    ];
+  }
+
   List<Widget> _buildFilteredSlivers(HomeProvider home, BuildContext context) {
     // Schedule the related-products fetch outside this build pass so we
     // don't setState during a build.
@@ -1351,12 +1448,40 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       if (!mounted) return;
       _maybeLoadRelatedFromSearch(home);
     });
+
+    // Auto-drilldown: when the active category filter has children
+    // (e.g. tap "Baby Care" → the children "Diapers", "Bath", "Feeding"
+    // exist), prepend a hero strip + sub-category tile grid above the
+    // products list. Children are pulled from the existing parent_id
+    // hierarchy, so this requires zero admin work — it Just Works as
+    // soon as someone sets up a category tree.
+    final drilldownSlivers = <Widget>[];
+    final activeId = home.categoryId;
+    if (activeId != null && home.search.isEmpty) {
+      Category? parentMatch;
+      for (final c in home.categories) {
+        if (c.id == activeId) {
+          parentMatch = c;
+          break;
+        }
+      }
+      final children = home.categories
+          .where((c) => c.parentId == activeId)
+          .toList();
+      if (parentMatch != null && children.isNotEmpty) {
+        drilldownSlivers.addAll(
+          _buildSubCategorySlivers(parentMatch, children, home),
+        );
+      }
+    }
+
     if (!home.firstGridLoaded && home.gridProducts.isEmpty) {
-      return [_skeletonGrid()];
+      return [...drilldownSlivers, _skeletonGrid()];
     }
     if (home.firstGridLoaded && home.gridProducts.isEmpty) {
       final searching = home.search.isNotEmpty;
       return [
+        ...drilldownSlivers,
         SliverToBoxAdapter(
           child: _EmptyView(
             icon: searching ? Icons.search_off : Icons.category_outlined,
@@ -1378,6 +1503,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       ];
     }
     return [
+      ...drilldownSlivers,
       _productGrid(home.gridProducts),
       if (home.loadingMore)
         const SliverToBoxAdapter(
@@ -1646,6 +1772,89 @@ class _ProfileAvatarButton extends StatelessWidget {
 /// image bottom-right) to a Row (text left, image right). Used when a
 /// single tile spans the full width — the column layout strands the
 /// labels above a huge image.
+/// Sub-category tile rendered in the auto-drilldown grid when a parent
+/// category is selected. Compact horizontal layout: image on the left,
+/// name on the right. Pulls the image straight from category.imageUrl
+/// (the same artwork the admin already uploaded for the chip row).
+class _SubCategoryTile extends StatelessWidget {
+  final Category category;
+  final VoidCallback onTap;
+  const _SubCategoryTile({required this.category, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                child: SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: category.imageUrl != null &&
+                          category.imageUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: category.imageUrl!,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 168,
+                          memCacheHeight: 168,
+                          errorWidget: (_, __, ___) =>
+                              const _SubCategoryFallback(),
+                          placeholder: (_, __) =>
+                              const _SubCategoryFallback(),
+                        )
+                      : const _SubCategoryFallback(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  category.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.inkFaint, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SubCategoryFallback extends StatelessWidget {
+  const _SubCategoryFallback();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        color: AppColors.sectionSky,
+        alignment: Alignment.center,
+        child: const Icon(Icons.category_outlined,
+            size: 22, color: AppColors.brandBlue),
+      );
+}
+
 class _ThemedTileCard extends StatelessWidget {
   final ThemedPageTile tile;
   final bool landscape;
