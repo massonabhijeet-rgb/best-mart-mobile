@@ -103,6 +103,26 @@ class _CategoryBrowserScreenState extends State<CategoryBrowserScreen> {
   void _selectSub(int? id) {
     if (_selectedSubId == id) return;
     HapticFeedback.selectionClick();
+
+    // If the tapped sub has its own children (e.g. Baby Care → Diapers
+    // & Wipes → New Born / Small / Medium / ...), drill in by pushing a
+    // fresh browser whose sidebar lists those grand-children. Sub-cats
+    // without a third level keep the existing inline-selection
+    // behaviour, so categories that aren't deeply nested are unaffected.
+    if (id != null) {
+      final home = context.read<HomeProvider>();
+      final hasGrandChildren =
+          home.categories.any((c) => c.parentId == id);
+      if (hasGrandChildren) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CategoryBrowserScreen(parentCategoryId: id),
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _selectedSubId = id);
     _fetch(reset: true);
   }
@@ -245,7 +265,7 @@ class _SidebarItem extends StatelessWidget {
         onTap: onTap,
         child: Stack(
           children: [
-            // Selection accent: green pill behind the chip + a left edge bar.
+            // Selection accent: green left edge bar (only on the active row).
             if (selected)
               Positioned(
                 left: 0,
@@ -273,8 +293,12 @@ class _SidebarItem extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
+                  Container(
+                    // Identical box dimensions across selected/unselected
+                    // states so circles never drift between rows. The
+                    // selection cue is a soft outer glow + the green
+                    // left-edge bar above; the border colour just shifts
+                    // tint without changing thickness.
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
@@ -284,14 +308,15 @@ class _SidebarItem extends StatelessWidget {
                         color: selected
                             ? AppColors.brandGreen
                             : AppColors.borderSoft,
-                        width: selected ? 1.6 : 0.8,
+                        width: 1,
                       ),
                       boxShadow: selected
                           ? [
                               BoxShadow(
                                 color: AppColors.brandGreen
-                                    .withValues(alpha: 0.18),
-                                blurRadius: 8,
+                                    .withValues(alpha: 0.22),
+                                blurRadius: 10,
+                                spreadRadius: 0.5,
                                 offset: const Offset(0, 2),
                               ),
                             ]
@@ -451,7 +476,7 @@ class _Banner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 10, 10, 6),
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -467,52 +492,34 @@ class _Banner extends StatelessWidget {
           width: 0.8,
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.ink,
-                    letterSpacing: -0.3,
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.inkMuted,
-                    fontWeight: FontWeight.w500,
-                    height: 1.3,
-                  ),
-                ),
-              ],
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+              color: AppColors.ink,
+              letterSpacing: -0.3,
+              height: 1.15,
             ),
           ),
-          if (imageUrl != null && imageUrl!.isNotEmpty)
-            SizedBox(
-              width: 70,
-              height: 70,
-              child: CachedNetworkImage(
-                imageUrl: imageUrl!,
-                fit: BoxFit.contain,
-                memCacheWidth: 220,
-                memCacheHeight: 220,
-                errorWidget: (_, __, ___) => const SizedBox.shrink(),
-              ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.inkMuted,
+              fontWeight: FontWeight.w500,
+              height: 1.3,
             ),
+          ),
         ],
       ),
     );
