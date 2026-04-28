@@ -45,6 +45,16 @@ class NotificationsService {
       },
     );
 
+    // iOS hides notification banners over a foregrounded app by default.
+    // Telling FCM to set these UNNotificationPresentationOptions makes iOS
+    // display the banner + sound + badge even when our app is in front,
+    // matching Android's behaviour.
+    await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
     FirebaseMessaging.onMessage.listen(_onForeground);
 
     // User tapped a notification while the app was backgrounded.
@@ -116,8 +126,10 @@ class NotificationsService {
   Future<void> _onForeground(RemoteMessage msg) async {
     final n = msg.notification;
     if (n == null) return;
-    // Serialise the data map so the tap handler can recover it when the
-    // user taps the in-app notification.
+    // iOS handles foreground display via setForegroundNotificationPresentationOptions
+    // already — calling _local.show would duplicate the banner. Android still
+    // needs this fallback because FCM doesn't reliably draw in foreground.
+    if (Platform.isIOS) return;
     final payload = msg.data.isEmpty ? null : jsonEncode(msg.data);
     await _local.show(
       msg.hashCode,
@@ -131,7 +143,6 @@ class NotificationsService {
           importance: Importance.high,
           priority: Priority.high,
         ),
-        iOS: DarwinNotificationDetails(),
       ),
       payload: payload,
     );
