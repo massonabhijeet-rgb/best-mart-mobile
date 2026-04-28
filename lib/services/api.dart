@@ -43,6 +43,13 @@ class ApiService {
     return h;
   }
 
+  // Fired when the server returns 401 on an authenticated request — usually
+  // because a newer device logged in with the same account and rotated the
+  // session. UI providers listen and bounce the user to the login screen.
+  static final Set<void Function()> _unauthorizedListeners = {};
+  static void onUnauthorized(void Function() cb) => _unauthorizedListeners.add(cb);
+  static void offUnauthorized(void Function() cb) => _unauthorizedListeners.remove(cb);
+
   static Future<dynamic> _req(String method, String path,
       {Map<String, dynamic>? body, bool auth = false}) async {
     final uri = Uri.parse('$kBaseUrl$path');
@@ -62,6 +69,13 @@ class ApiService {
         res = await http.get(uri, headers: headers);
     }
     final data = jsonDecode(res.body);
+    if (res.statusCode == 401 && auth) {
+      for (final cb in _unauthorizedListeners.toList()) {
+        try {
+          cb();
+        } catch (_) {}
+      }
+    }
     if (res.statusCode >= 400) {
       throw ApiException(data['error'] ?? 'Request failed');
     }
@@ -110,8 +124,13 @@ class ApiService {
     required String token,
     required String platform,
   }) async {
-    await _req('POST', '/devices',
+    final res = await _req('POST', '/devices',
         body: {'token': token, 'platform': platform}, auth: true);
+    final registeredFor = (res is Map) ? res['registeredFor'] : null;
+    if (registeredFor is Map) {
+      // ignore: avoid_print
+      print('[devices] server confirmed registration for userId=${registeredFor['id']} email=${registeredFor['email']}');
+    }
   }
 
   static Future<void> unregisterDevice(String token) async {

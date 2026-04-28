@@ -22,7 +22,20 @@ class AuthProvider extends ChangeNotifier {
         _user = User.fromJson(jsonDecode(userData));
       } catch (_) {}
     }
+    // Server signals "session ended elsewhere" via 401 on any authed call;
+    // ApiService fires the listener and we wipe local state here so the
+    // app falls back to the login screen on the next frame.
+    ApiService.onUnauthorized(_handleSessionEnded);
     _loading = false;
+    notifyListeners();
+  }
+
+  void _handleSessionEnded() {
+    if (_user == null) return;
+    _user = null;
+    ApiService.clearToken();
+    SharedPreferences.getInstance().then((p) => p.remove('user'));
+    NotificationsService.instance.unregister();
     notifyListeners();
   }
 
