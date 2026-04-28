@@ -47,3 +47,4 @@ app.*.map.json
 # Firebase service account keys must never be committed
 *-firebase-adminsdk-*.json
 firebase-admin.json
+ios/build/

@@ -124,13 +124,8 @@ class ApiService {
     required String token,
     required String platform,
   }) async {
-    final res = await _req('POST', '/devices',
+    await _req('POST', '/devices',
         body: {'token': token, 'platform': platform}, auth: true);
-    final registeredFor = (res is Map) ? res['registeredFor'] : null;
-    if (registeredFor is Map) {
-      // ignore: avoid_print
-      print('[devices] server confirmed registration for userId=${registeredFor['id']} email=${registeredFor['email']}');
-    }
   }
 
   static Future<void> unregisterDevice(String token) async {

@@ -73,7 +73,14 @@ class NotificationsService {
     if (settings.authorizationStatus == AuthorizationStatus.denied) return;
 
     if (Platform.isIOS) {
-      final apnsToken = await fm.getAPNSToken();
+      // First registration can race ahead of Apple's APNs handshake —
+      // getAPNSToken() returns null briefly until iOS finishes the
+      // round-trip. Retry a few times before giving up.
+      String? apnsToken = await fm.getAPNSToken();
+      for (int i = 0; apnsToken == null && i < 5; i++) {
+        await Future.delayed(const Duration(seconds: 1));
+        apnsToken = await fm.getAPNSToken();
+      }
       if (apnsToken == null) return;
     }
 

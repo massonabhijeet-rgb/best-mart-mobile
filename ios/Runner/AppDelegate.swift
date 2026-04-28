@@ -13,6 +13,11 @@ import GoogleMaps
     if #available(iOS 10.0, *) {
       UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
     }
+    // Firebase Messaging's auto-swizzling doesn't reliably trigger APNs
+    // registration on newer iOS/Flutter combos — calling this manually
+    // makes iOS hand back an APNs device token, which Firebase needs to
+    // mint an FCM token. Without this, iOS push silently never registers.
+    application.registerForRemoteNotifications()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
