@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 
-const String kBaseUrl = 'https://bestmart-delivery-app-production.up.railway.app/api';
+const String kBaseUrl = 'https://www.bestmart.co.in/api';
 
 class ApiException implements Exception {
   final String message;

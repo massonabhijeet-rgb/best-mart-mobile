@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/models.dart';
 
-const String kWsUrl = 'wss://bestmart-delivery-app-production.up.railway.app/ws';
+const String kWsUrl = 'wss://www.bestmart.co.in/ws';
 
 class SocketService {
   static SocketService? _instance;
