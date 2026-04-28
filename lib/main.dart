@@ -37,8 +37,38 @@ void main() async {
   );
 }
 
-class BestMartApp extends StatelessWidget {
+class BestMartApp extends StatefulWidget {
   const BestMartApp({super.key});
+
+  @override
+  State<BestMartApp> createState() => _BestMartAppState();
+}
+
+class _BestMartAppState extends State<BestMartApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Re-attempt push registration when the app returns to foreground —
+  // catches the case where the user opened iOS Settings, flipped
+  // notifications back ON, then came back without a cold restart.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final auth = context.read<AuthProvider>();
+      if (auth.isLoggedIn) {
+        NotificationsService.instance.registerForUser();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
