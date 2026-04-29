@@ -165,33 +165,52 @@ class _HomeRailState extends State<HomeRail> {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            height: ProductCard.totalHeight,
-            child: ListView.separated(
-              controller: _ctrl,
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.only(right: AppSpacing.md),
-              itemCount: widget.products.length + (widget.loadingMore ? 1 : 0),
-              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
-              itemBuilder: (_, i) {
-                if (i >= widget.products.length) {
-                  return const SizedBox(
-                    width: 80,
-                    child: Center(
-                      child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.brandBlue,
+          // Show exactly 3 cards across the visible area, regardless of phone
+          // size. Width = (screen − outer margins − inner padding − 2 gaps
+          // between 3 cards) / 3. Anything beyond the third card peeks at the
+          // edge to hint scrolling.
+          Builder(
+            builder: (context) {
+              final screen = MediaQuery.of(context).size.width;
+              const horizontalChrome = AppSpacing.md * 2 // SectionBackground margin
+                  + AppSpacing.md // SectionBackground padding (left only, right=0)
+                  + AppSpacing.md // ListView right padding
+                  + AppSpacing.md * 2; // 2 separators between 3 cards
+              final cardWidth = (screen - horizontalChrome) / 3;
+              return SizedBox(
+                height: ProductCard.totalHeight,
+                child: ListView.separated(
+                  controller: _ctrl,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(right: AppSpacing.md),
+                  itemCount:
+                      widget.products.length + (widget.loadingMore ? 1 : 0),
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: AppSpacing.md),
+                  itemBuilder: (_, i) {
+                    if (i >= widget.products.length) {
+                      return const SizedBox(
+                        width: 80,
+                        child: Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.brandBlue,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                }
-                return ProductCard(product: widget.products[i]);
-              },
-            ),
+                      );
+                    }
+                    return ProductCard(
+                      product: widget.products[i],
+                      width: cardWidth,
+                    );
+                  },
+                ),
+              );
+            },
           ),
         ],
       ),
