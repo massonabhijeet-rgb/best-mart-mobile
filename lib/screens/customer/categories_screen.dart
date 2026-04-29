@@ -58,17 +58,26 @@ class CategoriesScreen extends StatelessWidget {
 
     if (tops.isEmpty) return const _LoadingOrEmpty();
 
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 16, 12, 28),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.82,
-      ),
-      itemCount: tops.length,
-      itemBuilder: (_, i) =>
-          _CategoryTile(cat: tops[i], onTap: () => onCategoryTap(tops[i].id)),
+    return Builder(
+      builder: (context) {
+        // Bottom inset must clear the floating nav (~52 + 6 padding) plus
+        // the device's home-indicator safe area, plus the active-order
+        // ribbon when present (~52). 140 is enough on every form factor;
+        // unused space is invisible (background only).
+        final bottomInset = MediaQuery.of(context).padding.bottom + 140;
+        return GridView.builder(
+          padding: EdgeInsets.fromLTRB(12, 16, 12, bottomInset),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 16,
+            childAspectRatio: 0.82,
+          ),
+          itemCount: tops.length,
+          itemBuilder: (_, i) => _CategoryTile(
+              cat: tops[i], onTap: () => onCategoryTap(tops[i].id)),
+        );
+      },
     );
   }
 }

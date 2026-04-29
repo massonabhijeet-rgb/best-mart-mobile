@@ -222,15 +222,24 @@ class _Sidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 92,
+      width: 96,
+      // Soft vertical gradient + hairline right border. Sets the surface the
+      // glass tiles sit on so they have something subtle to refract against.
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColors.surface,
+            AppColors.sectionSky.withValues(alpha: 0.45),
+          ],
+        ),
         border: Border(
           right: BorderSide(color: AppColors.borderSoft, width: 0.6),
         ),
       ),
       child: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           for (final s in subs)
             _SidebarItem(
@@ -257,6 +266,12 @@ class _SidebarItem extends StatelessWidget {
     required this.onTap,
   });
 
+  // Tile dimensions. Image area is 70% of natural square so only the top
+  // 70% of the source photo shows — bottom 30% is clipped. Keeps the focal
+  // point (label / packaging head) visible without the background dead space.
+  static const double _tileWidth = 80;
+  static const double _tileHeight = 56; // 80 * 0.7
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -265,12 +280,13 @@ class _SidebarItem extends StatelessWidget {
         onTap: onTap,
         child: Stack(
           children: [
-            // Selection accent: green left edge bar (only on the active row).
+            // Selection accent: thin green bar pinned to the left edge of
+            // the active row — visible against any tile colour.
             if (selected)
               Positioned(
                 left: 0,
-                top: 4,
-                bottom: 4,
+                top: 6,
+                bottom: 6,
                 child: Container(
                   width: 3,
                   decoration: BoxDecoration(
@@ -293,47 +309,62 @@ class _SidebarItem extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Liquid-glass tile: rounded rectangle with a subtle
+                  // top-to-bottom gradient, hairline border, and a soft
+                  // drop shadow. Sized 80×56 (a 1.43:1 rectangle); image
+                  // fills it via BoxFit.cover anchored to topCenter, so a
+                  // square source image renders 80×80 and the bottom ~24px
+                  // is clipped — exactly the top 70%.
                   Container(
-                    // Identical box dimensions across selected/unselected
-                    // states so circles never drift between rows. The
-                    // selection cue is a soft outer glow + the green
-                    // left-edge bar above; the border colour just shifts
-                    // tint without changing thickness.
-                    width: 56,
-                    height: 56,
+                    width: _tileWidth,
+                    height: _tileHeight,
                     decoration: BoxDecoration(
-                      color: AppColors.sectionSky,
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: selected
+                            ? [
+                                AppColors.brandGreen.withValues(alpha: 0.18),
+                                AppColors.brandGreen.withValues(alpha: 0.04),
+                              ]
+                            : [
+                                Colors.white,
+                                Colors.white.withValues(alpha: 0.7),
+                              ],
+                      ),
                       border: Border.all(
                         color: selected
-                            ? AppColors.brandGreen
-                            : AppColors.borderSoft,
+                            ? AppColors.brandGreen.withValues(alpha: 0.55)
+                            : Colors.white.withValues(alpha: 0.85),
                         width: 1,
                       ),
-                      boxShadow: selected
-                          ? [
-                              BoxShadow(
-                                color: AppColors.brandGreen
-                                    .withValues(alpha: 0.22),
-                                blurRadius: 10,
-                                spreadRadius: 0.5,
-                                offset: const Offset(0, 2),
-                              ),
-                            ]
-                          : null,
+                      boxShadow: [
+                        BoxShadow(
+                          color: selected
+                              ? AppColors.brandGreen.withValues(alpha: 0.22)
+                              : Colors.black.withValues(alpha: 0.06),
+                          blurRadius: selected ? 14 : 10,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: ClipOval(
+                    child: ClipRRect(
+                      // Inner radius slightly tighter than outer so the
+                      // border line doesn't bleed into the clipped image.
+                      borderRadius: BorderRadius.circular(13),
                       child: imageUrl != null && imageUrl!.isNotEmpty
-                          ? Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: CachedNetworkImage(
-                                imageUrl: imageUrl!,
-                                fit: BoxFit.contain,
-                                memCacheWidth: 160,
-                                memCacheHeight: 160,
-                                errorWidget: (_, __, ___) => const Icon(
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl!,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.topCenter,
+                              memCacheWidth: 240,
+                              memCacheHeight: 240,
+                              errorWidget: (_, __, ___) => const Center(
+                                child: Icon(
                                   Icons.shopping_basket_rounded,
-                                  size: 22,
+                                  size: 24,
                                   color: AppColors.brandBlue,
                                 ),
                               ),
@@ -341,20 +372,20 @@ class _SidebarItem extends StatelessWidget {
                           : const Center(
                               child: Icon(
                                 Icons.apps_rounded,
-                                size: 22,
+                                size: 24,
                                 color: AppColors.brandBlue,
                               ),
                             ),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(
                     label,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 11,
                       fontWeight:
                           selected ? FontWeight.w800 : FontWeight.w600,
                       color: selected ? AppColors.ink : AppColors.inkMuted,
