@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'services/auth_provider.dart';
 import 'services/notifications_service.dart';
 import 'services/socket_service.dart';
+import 'providers/active_order_provider.dart';
 import 'providers/home_provider.dart';
 import 'providers/shop_status_provider.dart';
 import 'screens/auth/login_screen.dart';
@@ -24,6 +25,10 @@ void main() async {
   SocketService.instance.connect();
   final shopStatus = ShopStatusProvider();
   unawaited(shopStatus.init());
+  final activeOrders = ActiveOrderProvider();
+  if (auth.isLoggedIn) {
+    unawaited(activeOrders.load());
+  }
   runApp(
     MultiProvider(
       providers: [
@@ -31,6 +36,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => HomeProvider()),
         ChangeNotifierProvider.value(value: shopStatus),
+        ChangeNotifierProvider.value(value: activeOrders),
       ],
       child: const BestMartApp(),
     ),

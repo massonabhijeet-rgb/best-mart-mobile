@@ -2,8 +2,11 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
+import '../../providers/active_order_provider.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/active_order_ribbon.dart';
 import '../../widgets/cart_fab.dart';
 import 'categories_screen.dart';
 import 'category_browser_screen.dart';
@@ -22,6 +25,18 @@ class RootShell extends StatefulWidget {
 
 class _RootShellState extends State<RootShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load active orders the moment the user lands on the customer shell
+    // (after a fresh login, the cold-start `auth.isLoggedIn` check in
+    // main.dart was already false-then-true). Safe to call repeatedly —
+    // the provider guards against duplicate fetches.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<ActiveOrderProvider>().load();
+    });
+  }
 
   void _go(int i) {
     if (_index == i) return;
@@ -54,16 +69,25 @@ class _RootShellState extends State<RootShell> {
       ),
       bottomNavigationBar: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(child: _BottomNav(active: _index, onTap: _go)),
-              const SizedBox(width: 10),
-              const CartFab(),
-            ],
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Ribbon sits above the floating nav so it never overlaps the
+            // tabs or the cart FAB; auto-hides itself when no order is
+            // in progress.
+            const ActiveOrderRibbon(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: _BottomNav(active: _index, onTap: _go)),
+                  const SizedBox(width: 10),
+                  const CartFab(),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
