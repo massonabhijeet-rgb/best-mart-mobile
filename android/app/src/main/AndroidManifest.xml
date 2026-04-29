@@ -10,6 +10,16 @@
         android:label="bestmart"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Google Maps SDK for Android reads the key from the manifest at
+             startup. Without this tag, GoogleMap widget instantiation
+             throws and crashes the activity (was the address-picker
+             crash on Android). Key is restricted to package
+             com.bestmart.giddarbaha + the debug-keystore SHA-1; add a
+             second restriction in Google Cloud Console with the upload
+             keystore SHA-1 before shipping to Play Store. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyD-QfXQCxYD0ik4gQO6FnpT4fUmMiQGOOg"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

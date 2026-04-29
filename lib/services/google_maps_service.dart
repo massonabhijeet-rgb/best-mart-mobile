@@ -11,7 +11,7 @@ class GoogleMapsService {
   // widgets, but raw HTTPS calls (Geocoding, Directions) must send the bundle
   // header themselves — that's what [_platformHeaders] below is for.
   static const String _iosKey = 'AIzaSyCBu5pafJrGpsxVm0HlZQzzc2vwl_jJEsU';
-  static const String _androidKey = ''; // filled in later
+  static const String _androidKey = 'AIzaSyD-QfXQCxYD0ik4gQO6FnpT4fUmMiQGOOg';
 
   static String get _apiKey {
     if (Platform.isIOS) return _iosKey;
@@ -24,7 +24,7 @@ class GoogleMapsService {
       return {'X-Ios-Bundle-Identifier': 'com.bestmart.giddarbaha'};
     }
     if (Platform.isAndroid) {
-      return {'X-Android-Package': 'com.bestmart.bestmart'};
+      return {'X-Android-Package': 'com.bestmart.giddarbaha'};
     }
     return {};
   }
