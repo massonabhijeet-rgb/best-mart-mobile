@@ -82,15 +82,20 @@ class ApiService {
     return data;
   }
 
-  // Auth
+  // Auth — `client: 'customer'` tells the server this is the customer
+  // mobile app. Server rejects any role other than `viewer` for this
+  // client, so admins / pickers / riders can't accidentally sign into
+  // the shopping app with their staff credentials.
   static Future<Map<String, dynamic>> login(String email, String password) async {
-    final data = await _req('POST', '/auth/login', body: {'email': email, 'password': password});
+    final data = await _req('POST', '/auth/login',
+        body: {'email': email, 'password': password, 'client': 'customer'});
     await setToken(data['token']);
     return data;
   }
 
   static Future<Map<String, dynamic>> signup(String email, String password) async {
-    final data = await _req('POST', '/auth/signup', body: {'email': email, 'password': password});
+    final data = await _req('POST', '/auth/signup',
+        body: {'email': email, 'password': password, 'client': 'customer'});
     await setToken(data['token']);
     return data;
   }
@@ -114,6 +119,7 @@ class ApiService {
       'phone': phone,
       'otp': otp,
       'requestId': requestId,
+      'client': 'customer',
     });
     await setToken(data['token']);
     return data;
