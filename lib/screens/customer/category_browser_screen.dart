@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -309,73 +311,82 @@ class _SidebarItem extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Liquid-glass tile: rounded rectangle with a subtle
-                  // top-to-bottom gradient, hairline border, and a soft
-                  // drop shadow. Sized 80×56 (a 1.43:1 rectangle); image
-                  // fills it via BoxFit.cover anchored to topCenter, so a
-                  // square source image renders 80×80 and the bottom ~24px
-                  // is clipped — exactly the top 70%.
-                  Container(
-                    width: _tileWidth,
-                    height: _tileHeight,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: selected
-                            ? [
-                                AppColors.brandGreen.withValues(alpha: 0.18),
-                                AppColors.brandGreen.withValues(alpha: 0.04),
-                              ]
-                            : [
-                                Colors.white,
-                                Colors.white.withValues(alpha: 0.7),
-                              ],
-                      ),
-                      border: Border.all(
-                        color: selected
-                            ? AppColors.brandGreen.withValues(alpha: 0.55)
-                            : Colors.white.withValues(alpha: 0.85),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: selected
-                              ? AppColors.brandGreen.withValues(alpha: 0.22)
-                              : Colors.black.withValues(alpha: 0.06),
-                          blurRadius: selected ? 14 : 10,
-                          spreadRadius: 0,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      // Inner radius slightly tighter than outer so the
-                      // border line doesn't bleed into the clipped image.
-                      borderRadius: BorderRadius.circular(13),
-                      child: imageUrl != null && imageUrl!.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: imageUrl!,
-                              fit: BoxFit.cover,
-                              alignment: Alignment.topCenter,
-                              memCacheWidth: 240,
-                              memCacheHeight: 240,
-                              errorWidget: (_, __, ___) => const Center(
-                                child: Icon(
-                                  Icons.shopping_basket_rounded,
-                                  size: 24,
-                                  color: AppColors.brandBlue,
-                                ),
-                              ),
-                            )
-                          : const Center(
-                              child: Icon(
-                                Icons.apps_rounded,
-                                size: 24,
-                                color: AppColors.brandBlue,
-                              ),
+                  // Liquid-glass tile: capsule-rounded outer shell + a true
+                  // BackdropFilter blur so the sidebar's white→sky gradient
+                  // visibly refracts behind it. The pill shape (80×56 with
+                  // 26px corners ≈ ~93% of half-height) makes the tile read
+                  // as "rounder" while still cropping the source image to
+                  // its top 70% — focal area stays visible, dead background
+                  // is hidden.
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(26),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      child: Container(
+                        width: _tileWidth,
+                        height: _tileHeight,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(26),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: selected
+                                ? [
+                                    AppColors.brandGreen
+                                        .withValues(alpha: 0.22),
+                                    AppColors.brandGreen
+                                        .withValues(alpha: 0.06),
+                                  ]
+                                : [
+                                    Colors.white.withValues(alpha: 0.85),
+                                    Colors.white.withValues(alpha: 0.55),
+                                  ],
+                          ),
+                          border: Border.all(
+                            color: selected
+                                ? AppColors.brandGreen.withValues(alpha: 0.6)
+                                : Colors.white.withValues(alpha: 0.9),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: selected
+                                  ? AppColors.brandGreen.withValues(alpha: 0.25)
+                                  : Colors.black.withValues(alpha: 0.07),
+                              blurRadius: selected ? 16 : 12,
+                              spreadRadius: 0,
+                              offset: const Offset(0, 5),
                             ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          // Inner radius slightly tighter than outer so the
+                          // border line doesn't bleed into the clipped image.
+                          borderRadius: BorderRadius.circular(25),
+                          child: imageUrl != null && imageUrl!.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: imageUrl!,
+                                  fit: BoxFit.cover,
+                                  alignment: Alignment.topCenter,
+                                  memCacheWidth: 240,
+                                  memCacheHeight: 240,
+                                  errorWidget: (_, __, ___) => const Center(
+                                    child: Icon(
+                                      Icons.shopping_basket_rounded,
+                                      size: 24,
+                                      color: AppColors.brandBlue,
+                                    ),
+                                  ),
+                                )
+                              : const Center(
+                                  child: Icon(
+                                    Icons.apps_rounded,
+                                    size: 24,
+                                    color: AppColors.brandBlue,
+                                  ),
+                                ),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
