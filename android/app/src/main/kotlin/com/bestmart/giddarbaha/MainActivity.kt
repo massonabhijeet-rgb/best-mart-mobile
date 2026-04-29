@@ -1,4 +1,4 @@
-package com.bestmart.bestmart
+package com.bestmart.giddarbaha
 
 import io.flutter.embedding.android.FlutterActivity
 

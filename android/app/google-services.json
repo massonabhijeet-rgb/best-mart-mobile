@@ -23,6 +23,44 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:309492893073:android:a31f641fe578d80b67c630",
+        "android_client_info": {
+          "package_name": "com.bestmart.giddarbaha"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUNimj2iXF3g4vIRbG6S-R3LToDBp-1VU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:309492893073:android:97db58a19cdda7c367c630",
+        "android_client_info": {
+          "package_name": "com.bestmart.rider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUNimj2iXF3g4vIRbG6S-R3LToDBp-1VU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"
