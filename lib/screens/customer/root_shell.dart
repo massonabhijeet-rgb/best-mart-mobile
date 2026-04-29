@@ -8,6 +8,7 @@ import '../../providers/active_order_provider.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/active_order_ribbon.dart';
 import '../../widgets/cart_fab.dart';
+import 'cart_provider.dart';
 import 'categories_screen.dart';
 import 'category_browser_screen.dart';
 import 'order_again_screen.dart';
@@ -69,6 +70,11 @@ class _RootShellState extends State<RootShell> {
       ),
       bottomNavigationBar: SafeArea(
         top: false,
+        // Bottom inset trimmed: the system home-indicator gives ~34pt of
+        // safe area on its own; we don't need an extra 6pt cushion above
+        // it. Setting `minimum: zero` and shrinking the inner padding to
+        // 0 lets the floating nav sit ~6pt closer to the screen edge.
+        minimum: EdgeInsets.zero,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -76,16 +82,27 @@ class _RootShellState extends State<RootShell> {
             // tabs or the cart FAB; auto-hides itself when no order is
             // in progress.
             const ActiveOrderRibbon(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(child: _BottomNav(active: _index, onTap: _go)),
-                  const SizedBox(width: 10),
-                  const CartFab(),
-                ],
-              ),
+            // Cart FAB disappears entirely when the cart is empty —
+            // empty-state shouldn't surface a button that, on tap, would
+            // just say "your cart is empty". When the user adds the first
+            // item, the FAB animates in with the nav re-laying out around it.
+            Consumer<CartProvider>(
+              builder: (context, cart, _) {
+                final hasItems = cart.totalItems > 0;
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(child: _BottomNav(active: _index, onTap: _go)),
+                      if (hasItems) ...[
+                        const SizedBox(width: 10),
+                        const CartFab(),
+                      ],
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),
