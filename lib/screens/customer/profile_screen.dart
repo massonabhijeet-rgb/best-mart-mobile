@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../providers/active_order_provider.dart';
 import '../../services/auth_provider.dart';
 import '../../theme/tokens.dart';
+import 'cart_provider.dart';
 import 'my_orders_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -35,6 +37,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     if (ok != true || !mounted) return;
     setState(() => _busy = true);
+    // Clear user-scoped in-memory caches BEFORE auth.logout() so the
+    // login screen never paints with the previous user's cart badge or
+    // active-order ribbon. AuthProvider also wipes the on-disk prefs.
+    context.read<CartProvider>().clear();
+    context.read<ActiveOrderProvider>().clear();
     await context.read<AuthProvider>().logout();
     if (!mounted) return;
     Navigator.of(context).popUntil((r) => r.isFirst);

@@ -18,6 +18,15 @@ class ActiveOrderProvider extends ChangeNotifier {
   bool _loading = false;
   bool _wsAttached = false;
 
+  ActiveOrderProvider() {
+    // Wipe on a session-ended signal from the server so the previous
+    // user's "track order" ribbon doesn't flash for the next signed-in
+    // user before they've fetched their own orders.
+    ApiService.onUnauthorized(_clearOnSessionEnd);
+  }
+
+  void _clearOnSessionEnd() => clear();
+
   /// Tracks (publicId, status) pairs the user has explicitly dismissed via
   /// the ribbon's close button. Keying on status (not just publicId) means a
   /// status advance — say `confirmed` → `out_for_delivery` — re-surfaces the
@@ -103,6 +112,7 @@ class ActiveOrderProvider extends ChangeNotifier {
   void dispose() {
     _updatedSub?.cancel();
     _newSub?.cancel();
+    ApiService.offUnauthorized(_clearOnSessionEnd);
     super.dispose();
   }
 }

@@ -38,6 +38,19 @@ class CartProvider extends ChangeNotifier {
 
   CartProvider() {
     _load();
+    // Drop the basket the moment the server tells us the session ended
+    // (e.g. another device signed in and rotated the session_id). Without
+    // this the next user who logs in sees the previous user's items
+    // until they manually empty the cart.
+    ApiService.onUnauthorized(_clearOnSessionEnd);
+  }
+
+  void _clearOnSessionEnd() => clear();
+
+  @override
+  void dispose() {
+    ApiService.offUnauthorized(_clearOnSessionEnd);
+    super.dispose();
   }
 
   Map<String, CartItem> get items => _items;

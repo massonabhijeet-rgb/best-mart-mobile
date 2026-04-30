@@ -34,9 +34,21 @@ class AuthProvider extends ChangeNotifier {
     if (_user == null) return;
     _user = null;
     ApiService.clearToken();
-    SharedPreferences.getInstance().then((p) => p.remove('user'));
+    SharedPreferences.getInstance().then((p) => _wipeUserScopedKeys(p));
     NotificationsService.instance.unregister();
     notifyListeners();
+  }
+
+  /// Single source of truth for which prefs entries are tied to a signed-
+  /// in user. Anything user-specific the customer app caches between
+  /// launches goes through here so logout (and the silent 401 path) wipes
+  /// it. Kept additive: when a new prefs key is introduced, append it
+  /// here instead of duplicating the cleanup at every call site.
+  Future<void> _wipeUserScopedKeys(SharedPreferences prefs) async {
+    await prefs.remove('user');
+    // Cart contents persist across launches; without this the next user
+    // who logs in inherits the previous user's basket on first paint.
+    await prefs.remove('cart_items_v1');
   }
 
   Future<void> login(String email, String password) async {
@@ -75,7 +87,7 @@ class AuthProvider extends ChangeNotifier {
     _user = null;
     await ApiService.clearToken();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user');
+    await _wipeUserScopedKeys(prefs);
     notifyListeners();
   }
 
@@ -87,7 +99,7 @@ class AuthProvider extends ChangeNotifier {
     _user = null;
     await ApiService.clearToken();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user');
+    await _wipeUserScopedKeys(prefs);
     notifyListeners();
   }
 }
