@@ -12,6 +12,7 @@ import '../../providers/shop_status_provider.dart';
 import '../../services/api.dart';
 import '../../services/auth_provider.dart';
 import 'address_picker_screen.dart';
+import 'category_browser_screen.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/brand_strip.dart';
 import '../../widgets/category_tiles_grid.dart';
@@ -1181,7 +1182,19 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
           emoji: theme.emoji,
           tint: theme.tint,
           products: rail.products,
-          onSeeAll: () => home.setCategory(rail.id),
+          // "See all" opens the Blinkit-style browser (sub-categories
+          // sidebar on the left, products on the right) instead of just
+          // filtering the storefront grid — matches the Categories tab
+          // experience so users land on the same surface from either
+          // entry point.
+          onSeeAll: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    CategoryBrowserScreen(parentCategoryId: rail.id),
+              ),
+            );
+          },
         ),
       ));
       addGap();
