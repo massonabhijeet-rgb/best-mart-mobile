@@ -39,16 +39,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Single source of truth for which prefs entries are tied to a signed-
-  /// in user. Anything user-specific the customer app caches between
-  /// launches goes through here so logout (and the silent 401 path) wipes
-  /// it. Kept additive: when a new prefs key is introduced, append it
-  /// here instead of duplicating the cleanup at every call site.
+  /// Logout / session-end nuke. Wipes the entire local prefs store so
+  /// nothing carries over to the next signed-in user — addresses,
+  /// cart, last-picked delivery point, anything a future feature might
+  /// stash here. Token + user are also covered by this since they live
+  /// in the same store. The customer app holds no app-level (non-user)
+  /// state in prefs, so a full clear is safe.
   Future<void> _wipeUserScopedKeys(SharedPreferences prefs) async {
-    await prefs.remove('user');
-    // Cart contents persist across launches; without this the next user
-    // who logs in inherits the previous user's basket on first paint.
-    await prefs.remove('cart_items_v1');
+    await prefs.clear();
   }
 
   Future<void> login(String email, String password) async {
